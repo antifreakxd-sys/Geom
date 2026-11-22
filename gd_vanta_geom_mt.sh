@@ -1,6 +1,6 @@
 #!/system/bin/sh
 # VANTA GD: only download releases from GitHub; no local ~/gd_build or old .so files.
-# MT Manager: copy to /data/local/tmp/gd_vanta_github_mt.sh and execute.
+# MT Manager: copy to /data/local/tmp/gd_vanta_geom_mt.sh and execute.
 # Modes: --test (network test), --install (download release + launch/inject, default)
 # Owner/repository: https://github.com/antifreakxd-sys/Geom
 set -eu
