@@ -46,7 +46,7 @@ jobs:
           set -euxo pipefail
           NDK_BIN="$VANTA_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
           "$NDK_BIN/aarch64-linux-android24-clang++" \
-            -shared -fPIC -O2 -std=c++17 -fno-exceptions -fno-rtti \
+            -shared -fPIC -O2 -std=c++17 -fno-exceptions -fno-rtti -static-libstdc++ \
             -DIMGUI_IMPL_OPENGL_ES3 \
             -Isrc -Ideps/imgui -Ideps/imgui/backends \
             src/menu.cpp \
@@ -56,6 +56,7 @@ jobs:
             -lEGL -lGLESv3 -landroid -llog -ldl -lm \
             -Wl,--no-undefined -o libgdmenu.so
           "$NDK_BIN/llvm-readelf" -h libgdmenu.so | grep -E "Class:|Machine:"
+          "$NDK_BIN/llvm-readelf" -d libgdmenu.so | grep NEEDED
           sha256sum libgdmenu.so > libgdmenu.so.sha256
 
       - name: Publish rolling release
