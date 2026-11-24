@@ -1,4 +1,4 @@
--- GEOM UI 4.1 | monochrome, responsive, touch-first
+-- GEOM UI 4.2 | monochrome, responsive, touch-first
 -- LocalScript: StarterPlayer > StarterPlayerScripts
 -- All UI is created locally. Gameplay controls can be added to the category builders.
 
@@ -84,7 +84,7 @@ local header = new("Frame", panel, {
     Size = UDim2.new(1, -24, 0, 47),
 })
 text(header, "GEOM", 16, UDim2.fromOffset(2, 5), UDim2.fromOffset(110, 23), C.white, true)
-text(header, "CONTROL PANEL  /  4.1", 9, UDim2.fromOffset(2, 27), UDim2.fromOffset(185, 12), C.muted)
+text(header, "CONTROL PANEL  /  4.2", 9, UDim2.fromOffset(2, 27), UDim2.fromOffset(185, 12), C.muted)
 local close = button(header, "", C.card)
 close.AnchorPoint = Vector2.new(1, 0.5)
 close.Position = UDim2.new(1, 0, 0.5, 0)
@@ -366,9 +366,18 @@ end
 local visual = {
     enabled = false, players = true, bots = true, entities = true,
     names = true, kinds = true, distance = true, health = false,
-    highlight = false, throughWalls = false, range = 150, limit = 8, declutter = true,
+    highlight = false, throughWalls = true, range = 0, limit = 0, declutter = true,
 }
 local candidates, markers = {}, {}
+local radar = {enabled = false, players = true, bots = true, teammates = false, range = 400, radius = 90, limit = 16}
+local aim = {enabled = false, range = 250, angle = 12, smooth = 8, players = true, bots = true, teammates = false, circle = true, part = "Голова", prediction = 0}
+local function tracking() return visual.enabled or radar.enabled or aim.enabled end
+local trackingActive = false
+local onRadarUpdate = function() end
+local clearRadar = function() end
+local function isEnemy(owner)
+    return not owner or owner ~= player and (player.Neutral or owner.Neutral or player.Team ~= owner.Team)
+end
 local visualConnections = {}
 local epoch = 0
 local markerFolder = new("Folder", workspace, {Name = "GeomLocalMarkers"})
@@ -402,7 +411,7 @@ local function markerFor(model, part)
     local g = new("BillboardGui", playerGui, {
         Name = "GeomEntityLabel", Adornee = part, Size = UDim2.fromOffset(104, 25),
         StudsOffsetWorldSpace = Vector3.new(0, 2.8, 0), LightInfluence = 0,
-        AlwaysOnTop = visual.throughWalls, MaxDistance = visual.range,
+        AlwaysOnTop = visual.throughWalls, MaxDistance = visual.range > 0 and visual.range or 100000,
     })
     local name = new("TextLabel", g, {
         Size = UDim2.new(1, 0, 0, 12), Position = UDim2.fromOffset(0, 0),
@@ -427,7 +436,7 @@ local function markerFor(model, part)
 end
 
 local function updateVisuals()
-    if not visual.enabled then return end
+    if not visual.enabled then clearMarkers(); return end
     local camera = workspace.CurrentCamera
     if not camera then clearMarkers(); return end
     local own = player.Character
@@ -449,7 +458,7 @@ local function updateVisuals()
                 local part = entityPart(model, humanoid)
                 if part then
                     local d = (part.Position - origin).Magnitude
-                    if d <= visual.range then
+                    if visual.range == 0 or d <= visual.range then
                         table.insert(nearby, {model = model, humanoid = humanoid, owner = owner, part = part, kind = kind, distance = d})
                     end
                 end
@@ -459,19 +468,27 @@ local function updateVisuals()
     table.sort(nearby, function(a, b) return a.distance < b.distance end)
     local keep, selected, occupied = {}, {}, {}
     for _, entry in ipairs(nearby) do
-        if #selected >= visual.limit then break end
+        if visual.limit > 0 and #selected >= visual.limit then break end
         local head = entry.model:FindFirstChild("Head")
         local anchor = head and head:IsA("BasePart") and head.Position or entry.part.Position
         local screen, onScreen = camera:WorldToViewportPoint(anchor + Vector3.new(0, head and 1.2 or 2.0, 0))
-        local overlaps = false
+        -- Never discard a name because another label overlaps it.
+        -- Move overlapping labels vertically in screen-space instead.
+        local shift = 0
         if onScreen and visual.declutter then
-            for _, p in ipairs(occupied) do
-                if math.abs(p.X - screen.X) < 106 and math.abs(p.Y - screen.Y) < 28 then overlaps = true; break end
+            for attempt = 1, 12 do
+                local blocked = false
+                for _, p in ipairs(occupied) do
+                    if math.abs(p.X - screen.X) < 106 and math.abs(p.Y - (screen.Y - shift)) < 25 then blocked = true; break end
+                end
+                if not blocked then break end
+                shift += 25
             end
+            table.insert(occupied, Vector2.new(screen.X, screen.Y - shift))
         end
-        if onScreen and not overlaps then
-            table.insert(selected, entry); table.insert(occupied, screen); keep[entry.model] = true
-        end
+        entry.shift = shift
+        table.insert(selected, entry)
+        keep[entry.model] = true
     end
     local count = #selected
     local stale = {}
@@ -484,7 +501,8 @@ local function updateVisuals()
         item.gui.Adornee = (head and head:IsA("BasePart")) and head or entry.part
         item.gui.StudsOffsetWorldSpace = Vector3.new(0, (head and head:IsA("BasePart")) and 1.2 or 2.0, 0)
         item.gui.AlwaysOnTop = visual.throughWalls
-        item.gui.MaxDistance = visual.range
+        item.gui.MaxDistance = visual.range > 0 and visual.range or 100000
+        item.gui.SizeOffset = Vector2.new(0, entry.shift / 25)
         local name = entry.owner and entry.owner.DisplayName or entry.model.Name
         local parts = {}
         if visual.kinds then table.insert(parts, entry.kind == "PLAYER" and "PLY" or entry.kind == "ENTITY" and "ENT" or "BOT") end
@@ -511,13 +529,17 @@ local function updateVisuals()
 end
 local function stopVisuals()
     epoch += 1
+    trackingActive = false
     for _, c in ipairs(visualConnections) do c:Disconnect() end
     table.clear(visualConnections)
     table.clear(candidates)
     clearMarkers()
+    clearRadar()
 end
 local function startVisuals()
+    if trackingActive then return end
     stopVisuals()
+    trackingActive = true
     local ticket = epoch
     visualConnect(workspace.DescendantAdded, function(obj)
         if obj:IsA("Humanoid") then addCandidate(obj.Parent)
@@ -540,19 +562,20 @@ local function startVisuals()
             if obj:IsA("Humanoid") then addCandidate(obj.Parent) end
             if i % 300 == 0 then task.wait() end
         end
-        while visual.enabled and ticket == epoch do
+        while tracking() and ticket == epoch do
             updateVisuals()
-            task.wait(0.20)
+            onRadarUpdate()
+            task.wait(0.15)
         end
     end)
 end
+local function syncTracking()
+    if tracking() then startVisuals() else stopVisuals() end
+end
 local function setVisual(key, value)
     visual[key] = value
-    if key == "enabled" then
-        if value then startVisuals() else stopVisuals() end
-    else
-        updateVisuals()
-    end
+    syncTracking()
+    updateVisuals()
 end
 
 featureRow(pages.Visuals, 1, "ESP / Метки", function() return visual.enabled end,
@@ -566,8 +589,8 @@ featureRow(pages.Visuals, 1, "ESP / Метки", function() return visual.enable
             local key = item[1]
             toggle(inner, i, item[2], function() return visual[key] end, function(v) setVisual(key, v) end, true)
         end
-        choice(inner, 11, "Дальность (studs)", {75, 150, 250, 400, 600}, function() return visual.range end, function(v) setVisual("range", v) end)
-        choice(inner, 12, "Лимит меток", {4, 8, 12, 16}, function() return visual.limit end, function(v) setVisual("limit", v) end)
+        choice(inner, 11, "Дальность (studs)", {"Все", 75, 150, 250, 400, 600}, function() return visual.range == 0 and "Все" or visual.range end, function(v) setVisual("range", v == "Все" and 0 or v) end)
+        choice(inner, 12, "Лимит меток", {"Все", 4, 8, 16, 32}, function() return visual.limit == 0 and "Все" or visual.limit end, function(v) setVisual("limit", v == "Все" and 0 or v) end)
     end, "ESP")
 
 -- Category builders: only real UI functions and game information for now.
@@ -575,17 +598,171 @@ info(pages.Player, 1, player.DisplayName, "@" .. player.Name)
 info(pages.Player, 2, "Профиль", "ID: " .. tostring(player.UserId))
 
 
--- Camera aim assistance for the experience: only visible live targets, no firing.
--- NPC models opt in using the GeomAimTarget tag; player targets require game opt-in.
-local aim = {enabled = false, range = 120, angle = 12, smooth = 8, players = false}
+-- A viewport-aligned HUD, independent of menu safe-area insets.
+local hud = new("ScreenGui", playerGui, {
+    Name = "GeomVisualHUD", ResetOnSpawn = false, IgnoreGuiInset = true,
+    ScreenInsets = Enum.ScreenInsets.None, DisplayOrder = 40,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+})
+local fovRing = new("Frame", hud, {
+    Name = "AimFOV", AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(1, 1),
+    BackgroundTransparency = 1, Visible = false,
+})
+new("UICorner", fovRing, {CornerRadius = UDim.new(1, 0)})
+local fovStroke = outline(fovRing, C.white)
+fovStroke.Transparency = 0.35
+local function lineOfSight(origin, target, model, exclude)
+    local delta = target - origin
+    if delta.Magnitude < 0.01 then return true end
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = exclude and {exclude} or {}
+    local hit = workspace:Raycast(origin, delta, params)
+    return not hit or hit.Instance:IsDescendantOf(model)
+end
+
+-- Direction arrows: camera-relative bearing, including targets behind camera.
+-- Red means an unobstructed ray between characters, not a guaranteed weapon hit.
+local arrowItems, arrowPool, radarEntries = {}, {}, {}
+local RED = Color3.fromRGB(255, 75, 75)
+local function makeArrow()
+    local group = new("Frame", hud, {
+        AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(40, 30),
+        BackgroundTransparency = 1, Visible = false,
+    })
+    local icon = new("TextLabel", group, {
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(20, 9),
+        Size = UDim2.fromOffset(20, 19), BackgroundTransparency = 1,
+        Text = "▲", TextSize = 18, Font = Enum.Font.GothamBold,
+        TextStrokeTransparency = 0.3, TextColor3 = C.white,
+    })
+    local dist = new("TextLabel", group, {
+        Position = UDim2.fromOffset(0, 18), Size = UDim2.fromOffset(40, 12),
+        BackgroundTransparency = 1, TextSize = 10, Font = Enum.Font.GothamBold,
+        TextStrokeTransparency = 0.25, TextColor3 = C.white,
+    })
+    return {group = group, icon = icon, dist = dist}
+end
+clearRadar = function()
+    table.clear(radarEntries)
+    for model, item in pairs(arrowItems) do
+        item.group.Visible = false
+        table.insert(arrowPool, item)
+        arrowItems[model] = nil
+    end
+end
+onRadarUpdate = function()
+    if not radar.enabled then return end
+    local camera = workspace.CurrentCamera
+    if not camera then clearRadar(); return end
+    local own = player.Character
+    local originPart = own and (own:FindFirstChild("Head") or own:FindFirstChild("HumanoidRootPart"))
+    local origin = originPart and originPart:IsA("BasePart") and originPart.Position or camera.CFrame.Position
+    local all = {}
+    for model in pairs(candidates) do
+        if model ~= own and model:IsDescendantOf(workspace) then
+            local h = model:FindFirstChildOfClass("Humanoid")
+            local owner = Players:GetPlayerFromCharacter(model)
+            if h and h.Health > 0 and ((owner and radar.players and (radar.teammates or isEnemy(owner))) or (not owner and radar.bots)) then
+                local part = entityPart(model, h)
+                if part then
+                    local d = (part.Position - origin).Magnitude
+                    if d <= radar.range then table.insert(all, {model = model, part = part, distance = d}) end
+                end
+            end
+        end
+    end
+    table.sort(all, function(a,b) return a.distance < b.distance end)
+    local keep = {}
+    table.clear(radarEntries)
+    for i = 1, math.min(#all, radar.limit) do
+        local e = all[i]
+        local head = e.model:FindFirstChild("Head")
+        local p = head and head:IsA("BasePart") and head or e.part
+        e.visible = lineOfSight(origin, p.Position, e.model, own)
+            or lineOfSight(origin, e.part.Position, e.model, own)
+        keep[e.model] = true
+        table.insert(radarEntries, e)
+    end
+    for model, item in pairs(arrowItems) do
+        if not keep[model] then
+            item.group.Visible = false
+            table.insert(arrowPool, item)
+            arrowItems[model] = nil
+        end
+    end
+    for _, e in ipairs(radarEntries) do
+        local item = arrowItems[e.model]
+        if not item then
+            item = table.remove(arrowPool) or makeArrow()
+            arrowItems[e.model] = item
+        end
+        local color = e.visible and RED or C.white
+        item.icon.TextColor3 = color
+        item.dist.TextColor3 = color
+        item.dist.Text = tostring(math.floor(e.distance + 0.5)) .. "st"
+    end
+end
+local radarRender
+local function setRadar(value)
+    radar.enabled = value
+    if radarRender then radarRender:Disconnect(); radarRender = nil end
+    if value then
+        syncTracking()
+        onRadarUpdate()
+        radarRender = RunService.RenderStepped:Connect(function()
+            local cam = workspace.CurrentCamera
+            if not cam then return end
+            local radius = math.min(radar.radius, math.min(cam.ViewportSize.X, cam.ViewportSize.Y) * 0.36)
+            local occupied = {}
+            for _, e in ipairs(radarEntries) do
+                local item = arrowItems[e.model]
+                if item and e.part.Parent then
+                    local v = cam.CFrame:VectorToObjectSpace(e.part.Position - cam.CFrame.Position)
+                    local angle = math.atan2(v.X, -v.Z)
+                    local bucket = math.floor((angle + math.pi) / (math.pi * 2) * 16 + 0.5) % 16
+                    local layer = occupied[bucket] or 0
+                    occupied[bucket] = layer + 1
+                    local r = radius + layer * 23
+                    item.group.Position = UDim2.new(0.5, math.sin(angle) * r, 0.5, -math.cos(angle) * r)
+                    item.icon.Rotation = math.deg(angle)
+                    item.group.Visible = not opened and r < math.min(cam.ViewportSize.X, cam.ViewportSize.Y) * 0.46
+                elseif item then item.group.Visible = false end
+            end
+        end)
+    else
+        clearRadar()
+        syncTracking()
+    end
+end
+featureRow(pages.Visuals, 2, "Стрелки целей", function() return radar.enabled end, setRadar, function(inner)
+    toggle(inner, 1, "Игроки", function() return radar.players end, function(v) radar.players = v; onRadarUpdate() end, true)
+    toggle(inner, 2, "Боты / NPC", function() return radar.bots end, function(v) radar.bots = v; onRadarUpdate() end, true)
+    toggle(inner, 3, "Союзники", function() return radar.teammates end, function(v) radar.teammates = v; onRadarUpdate() end, true)
+    choice(inner, 4, "Радиус (px)", {55, 70, 90, 110, 140}, function() return radar.radius end, function(v) radar.radius = v end)
+    choice(inner, 5, "Дальность (studs)", {100, 200, 400, 800}, function() return radar.range end, function(v) radar.range = v; onRadarUpdate() end)
+    choice(inner, 6, "Лимит стрелок", {8, 16, 24, 32}, function() return radar.limit end, function(v) radar.limit = v; onRadarUpdate() end)
+end, "DIR")
+
+-- Camera aim assistance for the experience, with visible targets and frame-rate independent smoothing.
 local aimTarget, aimClock = nil, 0
 local aimStepName = "GeomAim_" .. tostring(player.UserId)
 local function targetPart(model)
     if not model or model == player.Character or not model:IsDescendantOf(workspace) then return nil end
-    local hum = model:FindFirstChildOfClass("Humanoid")
-    if not hum or hum.Health <= 0 then return nil end
-    local part = model:FindFirstChild("HumanoidRootPart")
-    return part and part:IsA("BasePart") and part or nil
+    local h = model:FindFirstChildOfClass("Humanoid")
+    if not h or h.Health <= 0 then return nil end
+    local owner = Players:GetPlayerFromCharacter(model)
+    if owner then
+        if not aim.players or (not aim.teammates and not isEnemy(owner)) then return nil end
+    elseif not aim.bots then return nil end
+    local names = aim.part == "Голова" and {"Head"} or aim.part == "Грудь" and {"UpperTorso", "Torso"}
+        or aim.part == "Таз" and {"LowerTorso", "HumanoidRootPart"} or {"HumanoidRootPart"}
+    for _, name in ipairs(names) do
+        local part = model:FindFirstChild(name)
+        if part and part:IsA("BasePart") then return part end
+    end
+    return entityPart(model, h)
 end
 local function aimScore(camera, model)
     local part = targetPart(model)
@@ -595,29 +772,14 @@ local function aimScore(camera, model)
     if distance < 1 or distance > aim.range then return nil end
     local angle = math.deg(math.acos(math.clamp(camera.CFrame.LookVector:Dot(delta.Unit), -1, 1)))
     if angle > aim.angle then return nil end
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances = player.Character and {player.Character} or {}
-    local hit = workspace:Raycast(camera.CFrame.Position, delta, params)
-    if hit and not hit.Instance:IsDescendantOf(model) then return nil end
+    if not lineOfSight(camera.CFrame.Position, part.Position, model, player.Character) then return nil end
     return angle, part
 end
 local function findAim(camera)
     local best, score = nil, math.huge
-    local function consider(model)
-        if not model:IsA("Model") then return end
+    for model in pairs(candidates) do
         local a = aimScore(camera, model)
         if a and a < score then best, score = model, a end
-    end
-    for _, model in ipairs(CollectionService:GetTagged("GeomAimTarget")) do
-        if not Players:GetPlayerFromCharacter(model) then consider(model) end
-    end
-    if aim.players and workspace:GetAttribute("GeomPvPAimAssist") == true then
-        for _, other in ipairs(Players:GetPlayers()) do
-            if other ~= player and other.Character and (player.Neutral or other.Neutral or player.Team ~= other.Team) then
-                consider(other.Character)
-            end
-        end
     end
     return best
 end
@@ -625,28 +787,39 @@ local function setAim(v)
     aim.enabled = v
     RunService:UnbindFromRenderStep(aimStepName)
     aimTarget, aimClock = nil, 0
+    fovRing.Visible = false
+    syncTracking()
     if v then
         RunService:BindToRenderStep(aimStepName, Enum.RenderPriority.Camera.Value + 1, function(dt)
             local camera = workspace.CurrentCamera
-            if not camera or opened or camera.CameraType == Enum.CameraType.Scriptable then aimTarget = nil; aimClock = 0; return end
+            if not camera then fovRing.Visible = false; return end
+            local viewport = camera.ViewportSize
+            local focal = viewport.Y / (2 * math.tan(math.rad(camera.FieldOfView * 0.5)))
+            local diameter = 2 * focal * math.tan(math.rad(aim.angle))
+            fovRing.Size = UDim2.fromOffset(diameter, diameter)
+            fovRing.Visible = aim.circle and not opened
+            if opened or camera.CameraType == Enum.CameraType.Scriptable then aimTarget = nil; aimClock = 0; return end
             aimClock -= dt
-            if aimClock <= 0 then aimTarget = findAim(camera); aimClock = 0.12 end
+            if aimClock <= 0 then aimTarget = findAim(camera); aimClock = 0.10 end
             if not aimTarget then return end
-            local owner = Players:GetPlayerFromCharacter(aimTarget)
-            if owner and (not aim.players or workspace:GetAttribute("GeomPvPAimAssist") ~= true or (not player.Neutral and not owner.Neutral and player.Team == owner.Team)) then aimTarget = nil; return end
-            local part = targetPart(aimTarget)
-            if not part then aimTarget = nil; return end
-            local delta = part.Position - camera.CFrame.Position
-            if delta.Magnitude < 1 or delta.Magnitude > aim.range then aimTarget = nil; return end
-            camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(camera.CFrame.Position, part.Position), 1 - math.exp(-aim.smooth * dt))
+            local _, part = aimScore(camera, aimTarget)
+            if not part then aimTarget = nil; aimClock = 0; return end
+            local position = part.Position + part.AssemblyLinearVelocity * aim.prediction
+            if (position - camera.CFrame.Position).Magnitude < 0.01 then return end
+            camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(camera.CFrame.Position, position), 1 - math.exp(-aim.smooth * dt))
         end)
     end
 end
 featureRow(pages.Combat, 1, "Aim Assist", function() return aim.enabled end, setAim, function(inner)
-    choice(inner, 1, "Угол (градусы)", {5, 8, 12, 18, 25}, function() return aim.angle end, function(v) aim.angle = v end)
-    choice(inner, 2, "Плавность", {3, 5, 8, 12, 16}, function() return aim.smooth end, function(v) aim.smooth = v end)
-    choice(inner, 3, "Дальность (studs)", {50, 80, 120, 180}, function() return aim.range end, function(v) aim.range = v end)
-    toggle(inner, 4, "Игроки (PvP)", function() return aim.players end, function(v) aim.players = v; aimClock = 0 end, true)
+    toggle(inner, 1, "Круг FOV", function() return aim.circle end, function(v) aim.circle = v end, true)
+    choice(inner, 2, "Точка наведения", {"Голова", "Грудь", "Таз", "Центр"}, function() return aim.part end, function(v) aim.part = v; aimClock = 0 end)
+    choice(inner, 3, "Предикт (сек.)", {0, 0.03, 0.06, 0.10, 0.15, 0.20}, function() return aim.prediction end, function(v) aim.prediction = v end)
+    choice(inner, 4, "Угол (градусы)", {5, 8, 12, 18, 25, 35}, function() return aim.angle end, function(v) aim.angle = v; aimClock = 0 end)
+    choice(inner, 5, "Плавность", {3, 5, 8, 12, 16, 24}, function() return aim.smooth end, function(v) aim.smooth = v end)
+    choice(inner, 6, "Дальность (studs)", {50, 120, 250, 400, 800}, function() return aim.range end, function(v) aim.range = v; aimClock = 0 end)
+    toggle(inner, 7, "Игроки", function() return aim.players end, function(v) aim.players = v; aimClock = 0 end, true)
+    toggle(inner, 8, "Боты / NPC", function() return aim.bots end, function(v) aim.bots = v; aimClock = 0 end, true)
+    toggle(inner, 9, "Союзники", function() return aim.teammates end, function(v) aim.teammates = v; aimClock = 0 end, true)
 end, "AIM")
 
 -- Local-only noclip for testing movement in this experience.
@@ -956,6 +1129,7 @@ end
 bindButton("AIM", "Aim Assist", 1, function() return aim.enabled end, setAim, 0.36)
 bindButton("ESP", "ESP", 2, function() return visual.enabled end, function(v) setVisual("enabled", v) end, 0.48)
 bindButton("NC", "Noclip", 3, function() return noclip end, setNoclip, 0.60)
+bindButton("DIR", "Стрелки целей", 4, function() return radar.enabled end, setRadar, 0.72)
 -- Update shortcut appearance when the equivalent menu switch changes.
 connect(RunService.Heartbeat, function()
     for key, item in pairs(bindItems) do
@@ -966,6 +1140,8 @@ end)
 
 gui.Destroying:Connect(function()
     setAim(false)
+    setRadar(false)
+    hud:Destroy()
     if noclip then setNoclip(false) end
     visual.enabled = false
     stopVisuals()
