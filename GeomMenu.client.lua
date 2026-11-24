@@ -1,4 +1,4 @@
--- GEOM UI 4.2 | monochrome, responsive, touch-first
+-- GEOM UI 4.3 | monochrome, responsive, touch-first
 -- LocalScript: StarterPlayer > StarterPlayerScripts
 -- All UI is created locally. Gameplay controls can be added to the category builders.
 
@@ -84,11 +84,11 @@ local header = new("Frame", panel, {
     Size = UDim2.new(1, -24, 0, 47),
 })
 text(header, "GEOM", 16, UDim2.fromOffset(2, 5), UDim2.fromOffset(110, 23), C.white, true)
-text(header, "CONTROL PANEL  /  4.2", 9, UDim2.fromOffset(2, 27), UDim2.fromOffset(185, 12), C.muted)
+text(header, "CONTROL PANEL  /  4.3", 9, UDim2.fromOffset(2, 27), UDim2.fromOffset(185, 12), C.muted)
 local close = button(header, "", C.card)
 close.AnchorPoint = Vector2.new(1, 0.5)
 close.Position = UDim2.new(1, 0, 0.5, 0)
-close.Size = UDim2.fromOffset(34, 34)
+close.Size = UDim2.fromOffset(44, 44)
 local function cross(parent, size, color)
     local icon = new("Frame", parent, {
         AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
@@ -180,19 +180,19 @@ for i, item in ipairs(categories) do
     local tab = button(nav, "", C.panel)
     tab.Name = key
     tab.LayoutOrder = i
-    tab.Size = UDim2.new(1, 0, 0, 29)
+    tab.Size = UDim2.new(1, 0, 0, 42)
     local marker = new("Frame", tab, {
         Position = UDim2.fromOffset(0, 8), Size = UDim2.new(0, 2, 1, -16),
         BackgroundColor3 = C.white, BackgroundTransparency = 1, BorderSizePixel = 0,
     })
     corner(marker, 2)
-    text(tab, index, 9, UDim2.fromOffset(7, 0), UDim2.fromOffset(16, 29), C.muted)
-    text(tab, title, 11, UDim2.fromOffset(24, 0), UDim2.new(1, -25, 1, 0), C.white)
+    local caption = text(tab, title, 13, UDim2.fromOffset(10, 0), UDim2.new(1, -20, 1, 0), C.white)
+    caption.TextXAlignment = Enum.TextXAlignment.Center
     tabs[key], marks[key] = tab, marker
 
     local page = new("ScrollingFrame", content, {
         Name = key, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1,
-        BorderSizePixel = 0, ScrollBarThickness = 2, ScrollBarImageColor3 = C.muted,
+        BorderSizePixel = 0, ScrollBarThickness = 4, ScrollBarImageColor3 = C.muted,
         CanvasSize = UDim2.fromOffset(0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y,
         ScrollingDirection = Enum.ScrollingDirection.Y, Visible = false,
     })
@@ -227,9 +227,9 @@ end
 local function toggle(page, order, title, getter, setter, compact)
     local b = button(page, "", C.card)
     b.LayoutOrder = order
-    b.Size = UDim2.new(1, 0, 0, compact and 34 or 42)
+    b.Size = UDim2.new(1, 0, 0, 44)
     if not compact then outline(b) end
-    text(b, title, 12, UDim2.fromOffset(9, 0), UDim2.new(1, -58, 1, 0), C.white)
+    text(b, title, 13, UDim2.fromOffset(9, 0), UDim2.new(1, -58, 1, 0), C.white)
     local track = new("Frame", b, {
         AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -9, 0.5, 0),
         Size = UDim2.fromOffset(36, 20), BackgroundColor3 = C.selected, BorderSizePixel = 0,
@@ -263,9 +263,9 @@ local function featureRow(page, order, title, getter, setter, build, key)
     outline(row)
     local arrow = button(row, "", C.card)
     arrow.Position = UDim2.fromOffset(2, 2)
-    arrow.Size = UDim2.fromOffset(40, 40)
+    arrow.Size = UDim2.new(1, -58, 0, 40)
     local chevron = new("Frame", arrow, {
-        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0, 19, 0.5, 0),
         Size = UDim2.fromOffset(12, 12), BackgroundTransparency = 1,
     })
     for _, spec in ipairs({{-2, 45}, {2, -45}}) do
@@ -276,7 +276,7 @@ local function featureRow(page, order, title, getter, setter, build, key)
         })
         corner(bar, 1)
     end
-    text(row, title, 13, UDim2.fromOffset(43, 0), UDim2.new(1, -98, 0, 44), C.white, true)
+    text(arrow, title, 13, UDim2.fromOffset(35, 0), UDim2.new(1, -39, 1, 0), C.white, true)
     local switch = button(row, "", C.card)
     switch.AnchorPoint = Vector2.new(1, 0)
     switch.Position = UDim2.new(1, -4, 0, 2)
@@ -336,18 +336,18 @@ end
 
 local function choice(parent, order, title, values, getter, setter)
     local row = new("Frame", parent, {
-        LayoutOrder = order, Size = UDim2.new(1, 0, 0, 56),
+        LayoutOrder = order, Size = UDim2.new(1, 0, 0, 66),
         BackgroundTransparency = 1,
     })
     text(row, title, 11, UDim2.fromOffset(8, 0), UDim2.new(1, -16, 0, 19), C.muted)
     local left = button(row, "−", C.panel)
     left.Position = UDim2.fromOffset(8, 20)
-    left.Size = UDim2.fromOffset(36, 34)
+    left.Size = UDim2.fromOffset(44, 44)
     local right = button(row, "+", C.panel)
     right.AnchorPoint = Vector2.new(1, 0)
     right.Position = UDim2.new(1, -8, 0, 20)
-    right.Size = UDim2.fromOffset(36, 34)
-    local value = text(row, "", 12, UDim2.fromOffset(46, 20), UDim2.new(1, -92, 0, 34), C.white, true)
+    right.Size = UDim2.fromOffset(44, 44)
+    local value = text(row, "", 12, UDim2.fromOffset(53, 20), UDim2.new(1, -106, 0, 44), C.white, true)
     value.TextXAlignment = Enum.TextXAlignment.Center
     local function refresh() value.Text = tostring(getter()) end
     local function step(delta)
@@ -363,14 +363,40 @@ end
 -- Entity markers for this experience. NPCs are humanoid models without a Player;
 -- non-humanoid entities can be tagged GeomEntity in Studio.
 -- All markers are local, disabled by default, and limited to nearby targets.
+-- A viewport-aligned HUD, independent of menu safe-area insets.
+local hud = new("ScreenGui", playerGui, {
+    Name = "GeomVisualHUD", ResetOnSpawn = false, IgnoreGuiInset = true,
+    ScreenInsets = Enum.ScreenInsets.None, DisplayOrder = 40,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+})
+local fovRing = new("Frame", hud, {
+    Name = "AimFOV", AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(1, 1),
+    BackgroundTransparency = 1, Visible = false,
+})
+new("UICorner", fovRing, {CornerRadius = UDim.new(1, 0)})
+local fovStroke = outline(fovRing, C.white)
+fovStroke.Transparency = 0.35
+local function lineOfSight(origin, target, model, exclude)
+    local delta = target - origin
+    if delta.Magnitude < 0.01 then return true end
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = exclude and {exclude} or {}
+    local hit = workspace:Raycast(origin, delta, params)
+    return not hit or hit.Instance:IsDescendantOf(model)
+end
+
+
 local visual = {
     enabled = false, players = true, bots = true, entities = true,
     names = true, kinds = true, distance = true, health = false,
     highlight = false, throughWalls = true, range = 0, limit = 0, declutter = true,
 }
 local candidates, markers = {}, {}
+local labelEntries = {}
 local radar = {enabled = false, players = true, bots = true, teammates = false, range = 400, radius = 90, limit = 16}
-local aim = {enabled = false, range = 250, angle = 12, smooth = 8, players = true, bots = true, teammates = false, circle = true, part = "Голова", prediction = 0}
+local aim = {enabled = false, range = 250, angle = 12, smooth = 0, players = true, bots = true, teammates = false, circle = true, part = "Голова", prediction = 0}
 local function tracking() return visual.enabled or radar.enabled or aim.enabled end
 local trackingActive = false
 local onRadarUpdate = function() end
@@ -381,7 +407,7 @@ end
 local visualConnections = {}
 local epoch = 0
 local markerFolder = new("Folder", workspace, {Name = "GeomLocalMarkers"})
--- BillboardGui instances are direct PlayerGui children for supported rendering.
+-- Labels are rendered in a viewport-aligned ScreenGui.
 local function visualConnect(signal, callback)
     table.insert(visualConnections, signal:Connect(callback))
 end
@@ -393,6 +419,7 @@ local function removeMarker(model)
     if item.highlight then item.highlight:Destroy() end
 end
 local function clearMarkers()
+    table.clear(labelEntries)
     local models = {}
     for model in pairs(markers) do table.insert(models, model) end
     for _, model in ipairs(models) do removeMarker(model) end
@@ -408,10 +435,10 @@ end
 local function markerFor(model, part)
     local item = markers[model]
     if item then return item end
-    local g = new("BillboardGui", playerGui, {
-        Name = "GeomEntityLabel", Adornee = part, Size = UDim2.fromOffset(104, 25),
-        StudsOffsetWorldSpace = Vector3.new(0, 2.8, 0), LightInfluence = 0,
-        AlwaysOnTop = visual.throughWalls, MaxDistance = visual.range > 0 and visual.range or 100000,
+    local g = new("Frame", hud, {
+        Name = "GeomEntityLabel", AnchorPoint = Vector2.new(0.5, 0.5),
+        Size = UDim2.fromOffset(104, 25), BackgroundTransparency = 1,
+        BorderSizePixel = 0, Visible = false, ZIndex = 2,
     })
     local name = new("TextLabel", g, {
         Size = UDim2.new(1, 0, 0, 12), Position = UDim2.fromOffset(0, 0),
@@ -466,30 +493,13 @@ local function updateVisuals()
         end
     end
     table.sort(nearby, function(a, b) return a.distance < b.distance end)
-    local keep, selected, occupied = {}, {}, {}
+    local keep, selected = {}, {}
     for _, entry in ipairs(nearby) do
         if visual.limit > 0 and #selected >= visual.limit then break end
-        local head = entry.model:FindFirstChild("Head")
-        local anchor = head and head:IsA("BasePart") and head.Position or entry.part.Position
-        local screen, onScreen = camera:WorldToViewportPoint(anchor + Vector3.new(0, head and 1.2 or 2.0, 0))
-        -- Never discard a name because another label overlaps it.
-        -- Move overlapping labels vertically in screen-space instead.
-        local shift = 0
-        if onScreen and visual.declutter then
-            for attempt = 1, 12 do
-                local blocked = false
-                for _, p in ipairs(occupied) do
-                    if math.abs(p.X - screen.X) < 106 and math.abs(p.Y - (screen.Y - shift)) < 25 then blocked = true; break end
-                end
-                if not blocked then break end
-                shift += 25
-            end
-            table.insert(occupied, Vector2.new(screen.X, screen.Y - shift))
-        end
-        entry.shift = shift
         table.insert(selected, entry)
         keep[entry.model] = true
     end
+    labelEntries = selected
     local count = #selected
     local stale = {}
     for model in pairs(markers) do if not keep[model] then table.insert(stale, model) end end
@@ -498,11 +508,9 @@ local function updateVisuals()
         local entry = selected[i]
         local item = markerFor(entry.model, entry.part)
         local head = entry.model:FindFirstChild("Head")
-        item.gui.Adornee = (head and head:IsA("BasePart")) and head or entry.part
-        item.gui.StudsOffsetWorldSpace = Vector3.new(0, (head and head:IsA("BasePart")) and 1.2 or 2.0, 0)
-        item.gui.AlwaysOnTop = visual.throughWalls
-        item.gui.MaxDistance = visual.range > 0 and visual.range or 100000
-        item.gui.SizeOffset = Vector2.new(0, entry.shift / 25)
+        item.part = head and head:IsA("BasePart") and head or entry.part
+        item.offset = item.part == head and 1.2 or 2.0
+        item.allowed = visual.throughWalls or lineOfSight(camera.CFrame.Position, item.part.Position, entry.model, own)
         local name = entry.owner and entry.owner.DisplayName or entry.model.Name
         local parts = {}
         if visual.kinds then table.insert(parts, entry.kind == "PLAYER" and "PLY" or entry.kind == "ENTITY" and "ENT" or "BOT") end
@@ -527,6 +535,68 @@ local function updateVisuals()
         end
     end
 end
+-- True pixel-space collision tests; labels follow the camera each rendered frame.
+local labelRender
+local function intersects(occupied, x, y, w, h)
+    for _, box in ipairs(occupied) do
+        if math.abs(x - box.x) < (w + box.w) * 0.5 + 2 and math.abs(y - box.y) < (h + box.h) * 0.5 + 2 then return true end
+    end
+    return false
+end
+local labelOverflow = new("TextLabel", hud, {
+    AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -25),
+    Size = UDim2.fromOffset(200, 18), BackgroundTransparency = 1,
+    TextColor3 = C.muted, TextStrokeTransparency = 0.2, TextSize = 11,
+    Font = Enum.Font.Gotham, Visible = false,
+})
+local function renderLabels()
+    local camera = workspace.CurrentCamera
+    if not camera then
+        for _, item in pairs(markers) do item.gui.Visible = false end
+        labelOverflow.Visible = false
+        return
+    end
+    local size = camera.ViewportSize
+    local occupied = {}
+    local overflow = 0
+    for _, entry in ipairs(labelEntries) do
+        local item = markers[entry.model]
+        if item then
+            local part = item.part
+            local found = false
+            if part and part.Parent and item.allowed and size.X >= 110 and size.Y >= 30 then
+                local p, onScreen = camera:WorldToViewportPoint(part.Position + Vector3.new(0, item.offset, 0))
+                if onScreen and p.Z > 0 then
+                    local x = math.clamp(p.X, 53, size.X - 53)
+                    local y = math.clamp(p.Y, 14, size.Y - 14)
+                    -- Prefer the original anchor, then alternate above/below; try adjacent columns.
+                    for column = 0, 4 do
+                        if found then break end
+                        local dx = column == 0 and 0 or math.ceil(column / 2) * 108 * (column % 2 == 1 and 1 or -1)
+                        local nx = x + dx
+                        if nx >= 53 and nx <= size.X - 53 then
+                            for n = 0, math.min(20, math.ceil(size.Y / 27) * 2) do
+                                local dy = n == 0 and 0 or math.ceil(n / 2) * 27 * (n % 2 == 1 and -1 or 1)
+                                local ny = y + dy
+                                if ny >= 14 and ny <= size.Y - 14 and (not visual.declutter or not intersects(occupied, nx, ny, 104, 25)) then
+                                    item.gui.Position = UDim2.fromOffset(nx, ny)
+                                    table.insert(occupied, {x = nx, y = ny, w = 104, h = 25})
+                                    found = true
+                                    break
+                                end
+                            end
+                        end
+                    end
+                    if not found then overflow += 1 end
+                end
+            end
+            item.gui.Visible = found and not opened
+        end
+    end
+    labelOverflow.Text = "+" .. overflow .. " меток"
+    labelOverflow.Visible = overflow > 0 and not opened
+end
+
 local function stopVisuals()
     epoch += 1
     trackingActive = false
@@ -535,6 +605,8 @@ local function stopVisuals()
     table.clear(candidates)
     clearMarkers()
     clearRadar()
+    if labelRender then labelRender:Disconnect(); labelRender = nil end
+    labelOverflow.Visible = false
 end
 local function startVisuals()
     if trackingActive then return end
@@ -576,6 +648,8 @@ local function setVisual(key, value)
     visual[key] = value
     syncTracking()
     updateVisuals()
+    if visual.enabled and not labelRender then labelRender = RunService.RenderStepped:Connect(renderLabels)
+    elseif not visual.enabled and labelRender then labelRender:Disconnect(); labelRender = nil; labelOverflow.Visible = false end
 end
 
 featureRow(pages.Visuals, 1, "ESP / Метки", function() return visual.enabled end,
@@ -597,30 +671,6 @@ featureRow(pages.Visuals, 1, "ESP / Метки", function() return visual.enable
 info(pages.Player, 1, player.DisplayName, "@" .. player.Name)
 info(pages.Player, 2, "Профиль", "ID: " .. tostring(player.UserId))
 
-
--- A viewport-aligned HUD, independent of menu safe-area insets.
-local hud = new("ScreenGui", playerGui, {
-    Name = "GeomVisualHUD", ResetOnSpawn = false, IgnoreGuiInset = true,
-    ScreenInsets = Enum.ScreenInsets.None, DisplayOrder = 40,
-    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-})
-local fovRing = new("Frame", hud, {
-    Name = "AimFOV", AnchorPoint = Vector2.new(0.5, 0.5),
-    Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(1, 1),
-    BackgroundTransparency = 1, Visible = false,
-})
-new("UICorner", fovRing, {CornerRadius = UDim.new(1, 0)})
-local fovStroke = outline(fovRing, C.white)
-fovStroke.Transparency = 0.35
-local function lineOfSight(origin, target, model, exclude)
-    local delta = target - origin
-    if delta.Magnitude < 0.01 then return true end
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances = exclude and {exclude} or {}
-    local hit = workspace:Raycast(origin, delta, params)
-    return not hit or hit.Instance:IsDescendantOf(model)
-end
 
 -- Direction arrows: camera-relative bearing, including targets behind camera.
 -- Red means an unobstructed ray between characters, not a guaranteed weapon hit.
@@ -704,6 +754,11 @@ onRadarUpdate = function()
         item.dist.Text = tostring(math.floor(e.distance + 0.5)) .. "st"
     end
 end
+local radarOverflow = new("TextLabel", hud, {
+    AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.5, 26),
+    Size = UDim2.fromOffset(100, 18), BackgroundTransparency = 1,
+    TextColor3 = C.muted, TextStrokeTransparency = 0.2, TextSize = 10, Font = Enum.Font.Gotham, Visible = false,
+})
 local radarRender
 local function setRadar(value)
     radar.enabled = value
@@ -714,25 +769,48 @@ local function setRadar(value)
         radarRender = RunService.RenderStepped:Connect(function()
             local cam = workspace.CurrentCamera
             if not cam then return end
-            local radius = math.min(radar.radius, math.min(cam.ViewportSize.X, cam.ViewportSize.Y) * 0.36)
+            local size = cam.ViewportSize
+            local half = math.min(size.X, size.Y) * 0.5
+            local radius = math.min(radar.radius, half - 28)
             local occupied = {}
+            local overflow = 0
             for _, e in ipairs(radarEntries) do
                 local item = arrowItems[e.model]
                 if item and e.part.Parent then
                     local v = cam.CFrame:VectorToObjectSpace(e.part.Position - cam.CFrame.Position)
                     local angle = math.atan2(v.X, -v.Z)
-                    local bucket = math.floor((angle + math.pi) / (math.pi * 2) * 16 + 0.5) % 16
-                    local layer = occupied[bucket] or 0
-                    occupied[bucket] = layer + 1
-                    local r = radius + layer * 23
-                    item.group.Position = UDim2.new(0.5, math.sin(angle) * r, 0.5, -math.cos(angle) * r)
-                    item.icon.Rotation = math.deg(angle)
-                    item.group.Visible = not opened and r < math.min(cam.ViewportSize.X, cam.ViewportSize.Y) * 0.46
+                    local found = false
+                    -- Try exact bearing first, then nearby angles and outward rings.
+                    -- Rectangles, rather than sectors, prevent cross-sector overlap.
+                    for layer = 0, 3 do
+                        if found then break end
+                        local rr = radius + layer * 35
+                        if rr > 0 and rr <= half - 20 then
+                            for n = 0, 8 do
+                                local da = n == 0 and 0 or math.ceil(n / 2) * math.rad(9) * (n % 2 == 1 and 1 or -1)
+                                local a = angle + da
+                                local x, y = size.X * 0.5 + math.sin(a) * rr, size.Y * 0.5 - math.cos(a) * rr
+                                if x >= 21 and x <= size.X - 21 and y >= 16 and y <= size.Y - 16
+                                    and not intersects(occupied, x, y, 40, 30) then
+                                    table.insert(occupied, {x = x, y = y, w = 40, h = 30})
+                                    item.group.Position = UDim2.fromOffset(x, y)
+                                    item.icon.Rotation = math.deg(angle)
+                                    found = true
+                                    break
+                                end
+                            end
+                        end
+                    end
+                    item.group.Visible = found and not opened
+                    if not found then overflow += 1 end
                 elseif item then item.group.Visible = false end
             end
+            radarOverflow.Text = "+" .. overflow .. " целей"
+            radarOverflow.Visible = overflow > 0 and not opened
         end)
     else
         clearRadar()
+        radarOverflow.Visible = false
         syncTracking()
     end
 end
@@ -762,6 +840,7 @@ local function targetPart(model)
         local part = model:FindFirstChild(name)
         if part and part:IsA("BasePart") then return part end
     end
+    if aim.part == "Голова" then return nil end
     return entityPart(model, h)
 end
 local function aimScore(camera, model)
@@ -800,13 +879,22 @@ local function setAim(v)
             fovRing.Visible = aim.circle and not opened
             if opened or camera.CameraType == Enum.CameraType.Scriptable then aimTarget = nil; aimClock = 0; return end
             aimClock -= dt
-            if aimClock <= 0 then aimTarget = findAim(camera); aimClock = 0.10 end
-            if not aimTarget then return end
-            local _, part = aimScore(camera, aimTarget)
-            if not part then aimTarget = nil; aimClock = 0; return end
+            local part
+            if aimTarget then local _, current = aimScore(camera, aimTarget); part = current end
+            if not part then
+                aimTarget = findAim(camera)
+                if aimTarget then local _, current = aimScore(camera, aimTarget); part = current end
+            end
+            if not part then aimTarget = nil; return end
             local position = part.Position + part.AssemblyLinearVelocity * aim.prediction
             if (position - camera.CFrame.Position).Magnitude < 0.01 then return end
-            camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(camera.CFrame.Position, position), 1 - math.exp(-aim.smooth * dt))
+            local goal = CFrame.lookAt(camera.CFrame.Position, position)
+            if aim.smooth == 0 then
+                camera.CFrame = goal
+            else
+                -- Smoothness is a response time in milliseconds; larger = slower.
+                camera.CFrame = camera.CFrame:Lerp(goal, 1 - math.exp(-dt / (aim.smooth / 1000)))
+            end
         end)
     end
 end
@@ -815,7 +903,7 @@ featureRow(pages.Combat, 1, "Aim Assist", function() return aim.enabled end, set
     choice(inner, 2, "Точка наведения", {"Голова", "Грудь", "Таз", "Центр"}, function() return aim.part end, function(v) aim.part = v; aimClock = 0 end)
     choice(inner, 3, "Предикт (сек.)", {0, 0.03, 0.06, 0.10, 0.15, 0.20}, function() return aim.prediction end, function(v) aim.prediction = v end)
     choice(inner, 4, "Угол (градусы)", {5, 8, 12, 18, 25, 35}, function() return aim.angle end, function(v) aim.angle = v; aimClock = 0 end)
-    choice(inner, 5, "Плавность", {3, 5, 8, 12, 16, 24}, function() return aim.smooth end, function(v) aim.smooth = v end)
+    choice(inner, 5, "Плавность (мс)", {0, 25, 50, 100, 150, 250, 400}, function() return aim.smooth end, function(v) aim.smooth = v end)
     choice(inner, 6, "Дальность (studs)", {50, 120, 250, 400, 800}, function() return aim.range end, function(v) aim.range = v; aimClock = 0 end)
     toggle(inner, 7, "Игроки", function() return aim.players end, function(v) aim.players = v; aimClock = 0 end, true)
     toggle(inner, 8, "Боты / NPC", function() return aim.bots end, function(v) aim.bots = v; aimClock = 0 end, true)
@@ -986,15 +1074,34 @@ end
 local function resize()
     local s = root.AbsoluteSize
     if s.X < 1 or s.Y < 1 then return end
-    local w = math.min(460, math.max(1, s.X - 16))
-    local h = math.min(248, math.max(1, s.Y - 16))
-    local narrow = w < 410
-    local side = narrow and 88 or 100
+    local portrait = s.Y > s.X or s.X < 440
+    local w = math.min(portrait and 420 or 500, math.max(1, s.X - 16))
+    local h = math.min(portrait and 420 or 290, math.max(1, s.Y - 16))
     panel.Size = UDim2.fromOffset(w, h)
-    rail.Size = UDim2.new(0, side, 1, -67)
-    separator.Position = UDim2.fromOffset(side + 17, 56)
-    content.Position = UDim2.fromOffset(side + 26, 57)
-    content.Size = UDim2.new(1, -(side + 36), 1, -68)
+    separator.Visible = not portrait
+    if portrait then
+        rail.Position = UDim2.fromOffset(8, 52)
+        rail.Size = UDim2.new(1, -16, 0, 45)
+        rail.ScrollingDirection = Enum.ScrollingDirection.X
+        rail.AutomaticCanvasSize = Enum.AutomaticSize.X
+        navLayout.FillDirection = Enum.FillDirection.Horizontal
+        nav.Size = UDim2.fromOffset(#categories * 97 - 3, 42)
+        for _, tab in pairs(tabs) do tab.Size = UDim2.fromOffset(94, 42) end
+        content.Position = UDim2.fromOffset(9, 103)
+        content.Size = UDim2.new(1, -18, 1, -112)
+    else
+        local side = 112
+        rail.Position = UDim2.fromOffset(9, 55)
+        rail.Size = UDim2.new(0, side, 1, -65)
+        rail.ScrollingDirection = Enum.ScrollingDirection.Y
+        rail.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        navLayout.FillDirection = Enum.FillDirection.Vertical
+        nav.Size = UDim2.new(1, 0, 0, #categories * 45 - 3)
+        for _, tab in pairs(tabs) do tab.Size = UDim2.new(1, 0, 0, 42) end
+        separator.Position = UDim2.fromOffset(side + 17, 56)
+        content.Position = UDim2.fromOffset(side + 26, 57)
+        content.Size = UDim2.new(1, -(side + 36), 1, -68)
+    end
     if not center then
         moveLauncher(Vector2.new(s.X - 32, s.Y * 0.30))
     elseif lastSize and lastSize.X > 0 and lastSize.Y > 0 and not drag then
@@ -1141,10 +1248,10 @@ end)
 gui.Destroying:Connect(function()
     setAim(false)
     setRadar(false)
-    hud:Destroy()
     if noclip then setNoclip(false) end
     visual.enabled = false
     stopVisuals()
+    hud:Destroy()
     markerFolder:Destroy()
     for _, c in ipairs(connections) do c:Disconnect() end
     local objects = {}
