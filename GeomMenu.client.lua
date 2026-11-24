@@ -273,7 +273,7 @@ local function featureRow(page, order, title, getter, setter, build)
         })
         corner(bar, 1)
     end
-    local name = text(row, title, 13, UDim2.fromOffset(43, 0), UDim2.new(1, -98, 0, 44), C.white, true)
+    text(row, title, 13, UDim2.fromOffset(43, 0), UDim2.new(1, -98, 0, 44), C.white, true)
     local switch = button(row, "", C.card)
     switch.AnchorPoint = Vector2.new(1, 0)
     switch.Position = UDim2.new(1, -4, 0, 2)
@@ -368,7 +368,7 @@ local candidates, markers = {}, {}
 local visualConnections = {}
 local epoch = 0
 local markerFolder = new("Folder", workspace, {Name = "GeomLocalMarkers"})
-local billboardFolder = new("Folder", playerGui, {Name = "GeomLocalLabels"})
+-- BillboardGui instances are direct PlayerGui children for supported rendering.
 local function visualConnect(signal, callback)
     table.insert(visualConnections, signal:Connect(callback))
 end
@@ -377,7 +377,7 @@ local function removeMarker(model)
     if not item then return end
     markers[model] = nil
     item.gui:Destroy()
-    item.highlight:Destroy()
+    if item.highlight then item.highlight:Destroy() end
 end
 local function clearMarkers()
     local models = {}
@@ -395,7 +395,7 @@ end
 local function markerFor(model, part)
     local item = markers[model]
     if item then return item end
-    local g = new("BillboardGui", billboardFolder, {
+    local g = new("BillboardGui", playerGui, {
         Name = "GeomEntityLabel", Adornee = part, Size = UDim2.fromOffset(170, 56),
         StudsOffsetWorldSpace = Vector3.new(0, 2.8, 0), LightInfluence = 0,
         AlwaysOnTop = visual.throughWalls, MaxDistance = visual.range,
@@ -417,12 +417,7 @@ local function markerFor(model, part)
     corner(bar, 2)
     local fill = new("Frame", bar, {Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.white, BorderSizePixel = 0})
     corner(fill, 2)
-    local hl = new("Highlight", markerFolder, {
-        Name = "GeomEntityOutline", Adornee = model, FillTransparency = 0.91,
-        OutlineTransparency = 0.18, OutlineColor = C.white, FillColor = C.white,
-        DepthMode = Enum.HighlightDepthMode.Occluded,
-    })
-    item = {gui = g, name = name, detail = detail, bar = bar, fill = fill, highlight = hl}
+    item = {gui = g, name = name, detail = detail, bar = bar, fill = fill}
     markers[model] = item
     return item
 end
@@ -433,7 +428,7 @@ local function updateVisuals()
     if not camera then clearMarkers(); return end
     local own = player.Character
     local ownRoot = own and own:FindFirstChild("HumanoidRootPart")
-    local origin = ownRoot and ownRoot.Position or camera.CFrame.Position
+    local origin = ownRoot and ownRoot:IsA("BasePart") and ownRoot.Position or camera.CFrame.Position
     local nearby = {}
     for model in pairs(candidates) do
         if not model:IsDescendantOf(workspace) then
@@ -482,8 +477,18 @@ local function updateVisuals()
         item.detail.Text = table.concat(parts, "  |  ")
         item.bar.Visible = visual.health and h ~= nil
         if h then item.fill.Size = UDim2.fromScale(math.clamp(h.Health / math.max(1, h.MaxHealth), 0, 1), 1) end
-        item.highlight.Enabled = visual.highlight
-        item.highlight.DepthMode = visual.throughWalls and Enum.HighlightDepthMode.AlwaysOnTop or Enum.HighlightDepthMode.Occluded
+        if visual.highlight then
+            if not item.highlight then
+                item.highlight = new("Highlight", markerFolder, {
+                    Name = "GeomEntityOutline", Adornee = entry.model, FillTransparency = 0.91,
+                    OutlineTransparency = 0.18, OutlineColor = C.white, FillColor = C.white,
+                })
+            end
+            item.highlight.DepthMode = visual.throughWalls and Enum.HighlightDepthMode.AlwaysOnTop or Enum.HighlightDepthMode.Occluded
+        elseif item.highlight then
+            item.highlight:Destroy()
+            item.highlight = nil
+        end
     end
 end
 local function stopVisuals()
@@ -497,7 +502,8 @@ local function startVisuals()
     stopVisuals()
     local ticket = epoch
     visualConnect(workspace.DescendantAdded, function(obj)
-        if obj:IsA("Humanoid") then addCandidate(obj.Parent) end
+        if obj:IsA("Humanoid") then addCandidate(obj.Parent)
+        elseif obj:IsA("Model") and (obj:FindFirstChildOfClass("Humanoid") or CollectionService:HasTag(obj, "GeomEntity")) then addCandidate(obj) end
     end)
     visualConnect(CollectionService:GetInstanceAddedSignal("GeomEntity"), addCandidate)
     visualConnect(CollectionService:GetInstanceRemovedSignal("GeomEntity"), function(model)
@@ -729,7 +735,6 @@ gui.Destroying:Connect(function()
     visual.enabled = false
     stopVisuals()
     markerFolder:Destroy()
-    billboardFolder:Destroy()
     for _, c in ipairs(connections) do c:Disconnect() end
     local objects = {}
     for obj in pairs(tweens) do table.insert(objects, obj) end
