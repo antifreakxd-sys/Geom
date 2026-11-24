@@ -537,11 +537,39 @@ local function updateVisuals()
 end
 -- True pixel-space collision tests; labels follow the camera each rendered frame.
 local labelRender
+-- Spatial hash: only inspect rectangles sharing nearby screen cells.
+local CELL = 64
+local function cellBounds(x, y, w, h)
+    return math.floor((x-w/2-2)/CELL), math.floor((x+w/2+2)/CELL),
+        math.floor((y-h/2-2)/CELL), math.floor((y+h/2+2)/CELL)
+end
 local function intersects(occupied, x, y, w, h)
-    for _, box in ipairs(occupied) do
-        if math.abs(x - box.x) < (w + box.w) * 0.5 + 2 and math.abs(y - box.y) < (h + box.h) * 0.5 + 2 then return true end
+    local x0, x1, y0, y1 = cellBounds(x,y,w,h)
+    for ix = x0, x1 do
+        local column = occupied[ix]
+        if column then
+            for iy = y0, y1 do
+                local cell = column[iy]
+                if cell then
+                    for _, box in ipairs(cell) do
+                        if math.abs(x-box.x) < (w+box.w)*0.5+2 and math.abs(y-box.y) < (h+box.h)*0.5+2 then return true end
+                    end
+                end
+            end
+        end
     end
     return false
+end
+local function occupy(occupied, x, y, w, h)
+    local x0, x1, y0, y1 = cellBounds(x,y,w,h)
+    local box = {x=x,y=y,w=w,h=h}
+    for ix = x0, x1 do
+        if not occupied[ix] then occupied[ix] = {} end
+        for iy = y0, y1 do
+            if not occupied[ix][iy] then occupied[ix][iy] = {} end
+            table.insert(occupied[ix][iy], box)
+        end
+    end
 end
 local labelOverflow = new("TextLabel", hud, {
     AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -25),
@@ -551,7 +579,7 @@ local labelOverflow = new("TextLabel", hud, {
 })
 local function renderLabels()
     local camera = workspace.CurrentCamera
-    if not camera then
+    if not camera or opened then
         for _, item in pairs(markers) do item.gui.Visible = false end
         labelOverflow.Visible = false
         return
@@ -580,7 +608,7 @@ local function renderLabels()
                                 local ny = y + dy
                                 if ny >= 14 and ny <= size.Y - 14 and (not visual.declutter or not intersects(occupied, nx, ny, 104, 25)) then
                                     item.gui.Position = UDim2.fromOffset(nx, ny)
-                                    table.insert(occupied, {x = nx, y = ny, w = 104, h = 25})
+                                    if visual.declutter then occupy(occupied, nx, ny, 104, 25) end
                                     found = true
                                     break
                                 end
@@ -679,7 +707,7 @@ local RED = Color3.fromRGB(255, 75, 75)
 local function makeArrow()
     local group = new("Frame", hud, {
         AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(40, 30),
-        BackgroundTransparency = 1, Visible = false,
+        BackgroundTransparency = 1, Visible = false, ZIndex = 3,
     })
     local icon = new("TextLabel", group, {
         AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(20, 9),
@@ -768,7 +796,11 @@ local function setRadar(value)
         onRadarUpdate()
         radarRender = RunService.RenderStepped:Connect(function()
             local cam = workspace.CurrentCamera
-            if not cam then return end
+            if not cam or opened then
+                for _, item in pairs(arrowItems) do item.group.Visible = false end
+                radarOverflow.Visible = false
+                return
+            end
             local size = cam.ViewportSize
             local half = math.min(size.X, size.Y) * 0.5
             local radius = math.min(radar.radius, half - 28)
@@ -792,7 +824,7 @@ local function setRadar(value)
                                 local x, y = size.X * 0.5 + math.sin(a) * rr, size.Y * 0.5 - math.cos(a) * rr
                                 if x >= 21 and x <= size.X - 21 and y >= 16 and y <= size.Y - 16
                                     and not intersects(occupied, x, y, 40, 30) then
-                                    table.insert(occupied, {x = x, y = y, w = 40, h = 30})
+                                    occupy(occupied, x, y, 40, 30)
                                     item.group.Position = UDim2.fromOffset(x, y)
                                     item.icon.Rotation = math.deg(angle)
                                     found = true
@@ -878,7 +910,6 @@ local function setAim(v)
             fovRing.Size = UDim2.fromOffset(diameter, diameter)
             fovRing.Visible = aim.circle and not opened
             if opened or camera.CameraType == Enum.CameraType.Scriptable then aimTarget = nil; aimClock = 0; return end
-            aimClock -= dt
             local part
             if aimTarget then local _, current = aimScore(camera, aimTarget); part = current end
             if not part then
