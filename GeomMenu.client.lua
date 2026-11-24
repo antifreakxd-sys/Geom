@@ -1,4 +1,4 @@
--- GEOM UI 4.0 | monochrome, responsive, touch-first
+-- GEOM UI 4.1 | monochrome, responsive, touch-first
 -- LocalScript: StarterPlayer > StarterPlayerScripts
 -- All UI is created locally. Gameplay controls can be added to the category builders.
 
@@ -7,7 +7,6 @@ local TweenService = game:GetService("TweenService")
 local UIS = game:GetService("UserInputService")
 local CollectionService = game:GetService("CollectionService")
 local RunService = game:GetService("RunService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local old = playerGui:FindFirstChild("GeomMenu")
@@ -85,7 +84,7 @@ local header = new("Frame", panel, {
     Size = UDim2.new(1, -24, 0, 47),
 })
 text(header, "GEOM", 16, UDim2.fromOffset(2, 5), UDim2.fromOffset(110, 23), C.white, true)
-text(header, "CONTROL PANEL  /  4.0", 9, UDim2.fromOffset(2, 27), UDim2.fromOffset(185, 12), C.muted)
+text(header, "CONTROL PANEL  /  4.1", 9, UDim2.fromOffset(2, 27), UDim2.fromOffset(185, 12), C.muted)
 local close = button(header, "", C.card)
 close.AnchorPoint = Vector2.new(1, 0.5)
 close.Position = UDim2.new(1, 0, 0.5, 0)
@@ -650,20 +649,63 @@ featureRow(pages.Combat, 1, "Aim Assist", function() return aim.enabled end, set
     toggle(inner, 4, "Игроки (PvP)", function() return aim.players end, function(v) aim.players = v; aimClock = 0 end, true)
 end, "AIM")
 
--- Noclip state is acknowledged by the server; no client-only physics bypass.
-local noclip = player:GetAttribute("GeomNoclipActive") == true
-local function setNoclip(v)
-    local remote = ReplicatedStorage:FindFirstChild("GeomMovement")
-    if remote and remote:IsA("RemoteEvent") then remote:FireServer(v) end
-end
+-- Local-only noclip for testing movement in this experience.
+-- Server-authoritative physics may override local collision changes.
+local noclip = false
 local refreshNoclip
 local bindRefresh = {}
-local function syncNoclip()
-    noclip = player:GetAttribute("GeomNoclipActive") == true
+local collisionState = {}
+local collisionConnection
+local collisionCharacter
+local function restoreCollision()
+    for part, original in pairs(collisionState) do
+        if part.Parent then part.CanCollide = original end
+    end
+    table.clear(collisionState)
+    collisionCharacter = nil
+end
+local function updateCollision()
+    local character = player.Character
+    if collisionCharacter ~= character then
+        restoreCollision()
+        collisionCharacter = character
+    end
+    if not character then return end
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            if collisionState[part] == nil then
+                collisionState[part] = part.CanCollide
+            end
+            if part.CanCollide then part.CanCollide = false end
+        end
+    end
+    for part, original in pairs(collisionState) do
+        if not part:IsDescendantOf(character) then
+            if part.Parent then part.CanCollide = original end
+            collisionState[part] = nil
+        end
+    end
+end
+local function setNoclip(v)
+    v = v == true
+    if noclip == v then return end
+    noclip = v
+    if collisionConnection then
+        collisionConnection:Disconnect()
+        collisionConnection = nil
+    end
+    if v then
+        updateCollision()
+        collisionConnection = RunService.PreSimulation:Connect(updateCollision)
+    else
+        restoreCollision()
+    end
     if refreshNoclip then refreshNoclip(false) end
     if bindRefresh.NC then bindRefresh.NC() end
 end
-connect(player:GetAttributeChangedSignal("GeomNoclipActive"), syncNoclip)
+connect(player.CharacterRemoving, function()
+    if noclip then setNoclip(false) end
+end)
 local noclipRow
 noclipRow, refreshNoclip = toggle(pages.Other, 1, "Noclip", function() return noclip end, setNoclip)
 
