@@ -1,10 +1,11 @@
--- GEOM UI 2.0 | monochrome, responsive, touch-first
+-- GEOM UI 3.0 | monochrome, responsive, touch-first
 -- LocalScript: StarterPlayer > StarterPlayerScripts
 -- All UI is created locally. Gameplay controls can be added to the category builders.
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UIS = game:GetService("UserInputService")
+local CollectionService = game:GetService("CollectionService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local old = playerGui:FindFirstChild("GeomMenu")
@@ -68,11 +69,11 @@ local backdrop = new("TextButton", root, {
     BackgroundTransparency = 1, BorderSizePixel = 0, Text = "",
     AutoButtonColor = false, Visible = false, ZIndex = 2, Selectable = false,
 })
-local panel = new("CanvasGroup", root, {
+local panel = new("Frame", root, {
     Name = "Menu", AnchorPoint = Vector2.new(0.5, 0.5),
     Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(580, 320),
     BackgroundColor3 = C.panel, BorderSizePixel = 0,
-    GroupTransparency = 1, Visible = false, ZIndex = 3, ClipsDescendants = true,
+    Active = true, Visible = false, ZIndex = 3, ClipsDescendants = true,
 })
 corner(panel, 15)
 outline(panel)
@@ -82,7 +83,7 @@ local header = new("Frame", panel, {
     Size = UDim2.new(1, -24, 0, 47),
 })
 text(header, "GEOM", 16, UDim2.fromOffset(2, 5), UDim2.fromOffset(110, 23), C.white, true)
-text(header, "CONTROL PANEL  /  2.0", 9, UDim2.fromOffset(2, 27), UDim2.fromOffset(185, 12), C.muted)
+text(header, "CONTROL PANEL  /  3.0", 9, UDim2.fromOffset(2, 27), UDim2.fromOffset(185, 12), C.muted)
 local close = button(header, "", C.card)
 close.AnchorPoint = Vector2.new(1, 0.5)
 close.Position = UDim2.new(1, 0, 0.5, 0)
@@ -166,9 +167,10 @@ end
 local categories = {
     {"Player", "Игрок", "01"},
     {"Combat", "Бой", "02"},
-    {"Other", "Остальное", "03"},
-    {"Settings", "Настройки", "04"},
-    {"Games", "Игры", "05"},
+    {"Visuals", "Визуалы", "03"},
+    {"Other", "Остальное", "04"},
+    {"Settings", "Настройки", "05"},
+    {"Games", "Игры", "06"},
 }
 for i, item in ipairs(categories) do
     local key, title, index = item[1], item[2], item[3]
@@ -219,11 +221,11 @@ local function action(page, order, title, callback)
     connect(b.Activated, callback)
     return b
 end
-local function toggle(page, order, title, getter, setter)
+local function toggle(page, order, title, getter, setter, compact)
     local b = button(page, "", C.card)
     b.LayoutOrder = order
-    b.Size = UDim2.new(1, 0, 0, 42)
-    outline(b)
+    b.Size = UDim2.new(1, 0, 0, compact and 34 or 42)
+    if not compact then outline(b) end
     text(b, title, 12, UDim2.fromOffset(9, 0), UDim2.new(1, -58, 1, 0), C.white)
     local track = new("Frame", b, {
         AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -9, 0.5, 0),
@@ -247,6 +249,303 @@ local function toggle(page, order, title, getter, setter)
     refresh(true)
     return b
 end
+
+-- Reusable accordion: separate touch targets for options and the main switch.
+local function featureRow(page, order, title, getter, setter, build)
+    local row = new("Frame", page, {
+        LayoutOrder = order, Size = UDim2.new(1, 0, 0, 44),
+        BackgroundColor3 = C.card, BorderSizePixel = 0, ClipsDescendants = true,
+    })
+    corner(row, 9)
+    outline(row)
+    local arrow = button(row, "", C.card)
+    arrow.Position = UDim2.fromOffset(2, 2)
+    arrow.Size = UDim2.fromOffset(40, 40)
+    local chevron = new("Frame", arrow, {
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromOffset(12, 12), BackgroundTransparency = 1,
+    })
+    for _, spec in ipairs({{-2, 45}, {2, -45}}) do
+        local bar = new("Frame", chevron, {
+            AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, spec[1]),
+            Size = UDim2.fromOffset(7, 1.5), Rotation = spec[2],
+            BackgroundColor3 = C.muted, BorderSizePixel = 0,
+        })
+        corner(bar, 1)
+    end
+    local name = text(row, title, 13, UDim2.fromOffset(43, 0), UDim2.new(1, -98, 0, 44), C.white, true)
+    local switch = button(row, "", C.card)
+    switch.AnchorPoint = Vector2.new(1, 0)
+    switch.Position = UDim2.new(1, -4, 0, 2)
+    switch.Size = UDim2.fromOffset(50, 40)
+    local track = new("Frame", switch, {
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromOffset(36, 20), BackgroundColor3 = C.selected, BorderSizePixel = 0,
+    })
+    corner(track, 10)
+    local knob = new("Frame", track, {
+        AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(14, 14),
+        BackgroundColor3 = C.white, BorderSizePixel = 0,
+    })
+    corner(knob, 7)
+    local function refresh(now)
+        local on = getter()
+        animate(track, now and 0 or 0.16, {BackgroundColor3 = on and C.white or C.selected})
+        animate(knob, now and 0 or 0.20, {
+            Position = UDim2.new(0, on and 25 or 11, 0.5, 0),
+            BackgroundColor3 = on and C.darkText or C.white,
+        })
+    end
+    connect(switch.Activated, function() setter(not getter()); refresh(false) end)
+    refresh(true)
+    local inner = new("Frame", row, {
+        Position = UDim2.fromOffset(7, 47), Size = UDim2.new(1, -14, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1,
+        Visible = false,
+    })
+    local layout = new("UIListLayout", inner, {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 3)})
+    build(inner)
+    local expanded, revision = false, 0
+    local function fit(now)
+        local h = expanded and (layout.AbsoluteContentSize.Y + 54) or 44
+        animate(row, now and 0 or 0.22, {Size = UDim2.new(1, 0, 0, h)})
+    end
+    connect(layout:GetPropertyChangedSignal("AbsoluteContentSize"), function()
+        if expanded then fit(false) end
+    end)
+    connect(arrow.Activated, function()
+        expanded = not expanded
+        revision += 1
+        local current = revision
+        if expanded then inner.Visible = true end
+        animate(chevron, 0.20, {Rotation = expanded and 90 or 0})
+        local t = animate(row, 0.22, {Size = UDim2.new(1, 0, 0, expanded and (layout.AbsoluteContentSize.Y + 54) or 44)})
+        if not expanded then
+            local function hide()
+                if current == revision and not expanded then inner.Visible = false end
+            end
+            if t then t.Completed:Once(hide) else hide() end
+        end
+    end)
+    return row
+end
+
+local function choice(parent, order, title, values, getter, setter)
+    local row = new("Frame", parent, {
+        LayoutOrder = order, Size = UDim2.new(1, 0, 0, 56),
+        BackgroundTransparency = 1,
+    })
+    text(row, title, 11, UDim2.fromOffset(8, 0), UDim2.new(1, -16, 0, 19), C.muted)
+    local left = button(row, "−", C.panel)
+    left.Position = UDim2.fromOffset(8, 20)
+    left.Size = UDim2.fromOffset(36, 34)
+    local right = button(row, "+", C.panel)
+    right.AnchorPoint = Vector2.new(1, 0)
+    right.Position = UDim2.new(1, -8, 0, 20)
+    right.Size = UDim2.fromOffset(36, 34)
+    local value = text(row, "", 12, UDim2.fromOffset(46, 20), UDim2.new(1, -92, 0, 34), C.white, true)
+    value.TextXAlignment = Enum.TextXAlignment.Center
+    local function refresh() value.Text = tostring(getter()) end
+    local function step(delta)
+        local i = table.find(values, getter()) or 1
+        setter(values[math.clamp(i + delta, 1, #values)])
+        refresh()
+    end
+    connect(left.Activated, function() step(-1) end)
+    connect(right.Activated, function() step(1) end)
+    refresh()
+end
+
+-- Entity markers for this experience. NPCs are humanoid models without a Player;
+-- non-humanoid entities can be tagged GeomEntity in Studio.
+-- All markers are local, disabled by default, and limited to nearby targets.
+local visual = {
+    enabled = false, players = true, bots = true, entities = true,
+    names = true, kinds = true, distance = true, health = true,
+    highlight = true, throughWalls = false, range = 250, limit = 16,
+}
+local candidates, markers = {}, {}
+local visualConnections = {}
+local epoch = 0
+local markerFolder = new("Folder", workspace, {Name = "GeomLocalMarkers"})
+local billboardFolder = new("Folder", playerGui, {Name = "GeomLocalLabels"})
+local function visualConnect(signal, callback)
+    table.insert(visualConnections, signal:Connect(callback))
+end
+local function removeMarker(model)
+    local item = markers[model]
+    if not item then return end
+    markers[model] = nil
+    item.gui:Destroy()
+    item.highlight:Destroy()
+end
+local function clearMarkers()
+    local models = {}
+    for model in pairs(markers) do table.insert(models, model) end
+    for _, model in ipairs(models) do removeMarker(model) end
+end
+local function addCandidate(model)
+    if model and model:IsA("Model") and model:IsDescendantOf(workspace) then candidates[model] = true end
+end
+local function entityPart(model, humanoid)
+    local p = model:FindFirstChild("HumanoidRootPart") or (humanoid and humanoid.RootPart) or model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
+    if p and p:IsA("BasePart") then return p end
+    return nil
+end
+local function markerFor(model, part)
+    local item = markers[model]
+    if item then return item end
+    local g = new("BillboardGui", billboardFolder, {
+        Name = "GeomEntityLabel", Adornee = part, Size = UDim2.fromOffset(170, 56),
+        StudsOffsetWorldSpace = Vector3.new(0, 2.8, 0), LightInfluence = 0,
+        AlwaysOnTop = visual.throughWalls, MaxDistance = visual.range,
+    })
+    local name = new("TextLabel", g, {
+        Size = UDim2.new(1, 0, 0, 23), Position = UDim2.fromOffset(0, 1),
+        BackgroundTransparency = 1, TextColor3 = C.white, TextStrokeTransparency = 0.15,
+        TextSize = 14, Font = Enum.Font.GothamBold, TextTruncate = Enum.TextTruncate.AtEnd,
+    })
+    local detail = new("TextLabel", g, {
+        Size = UDim2.new(1, 0, 0, 19), Position = UDim2.fromOffset(0, 24),
+        BackgroundTransparency = 1, TextColor3 = C.white, TextStrokeTransparency = 0.15,
+        TextSize = 11, Font = Enum.Font.GothamMedium,
+    })
+    local bar = new("Frame", g, {
+        AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 46),
+        Size = UDim2.fromOffset(64, 4), BackgroundColor3 = C.selected, BorderSizePixel = 0,
+    })
+    corner(bar, 2)
+    local fill = new("Frame", bar, {Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.white, BorderSizePixel = 0})
+    corner(fill, 2)
+    local hl = new("Highlight", markerFolder, {
+        Name = "GeomEntityOutline", Adornee = model, FillTransparency = 0.91,
+        OutlineTransparency = 0.18, OutlineColor = C.white, FillColor = C.white,
+        DepthMode = Enum.HighlightDepthMode.Occluded,
+    })
+    item = {gui = g, name = name, detail = detail, bar = bar, fill = fill, highlight = hl}
+    markers[model] = item
+    return item
+end
+
+local function updateVisuals()
+    if not visual.enabled then return end
+    local camera = workspace.CurrentCamera
+    if not camera then clearMarkers(); return end
+    local own = player.Character
+    local ownRoot = own and own:FindFirstChild("HumanoidRootPart")
+    local origin = ownRoot and ownRoot.Position or camera.CFrame.Position
+    local nearby = {}
+    for model in pairs(candidates) do
+        if not model:IsDescendantOf(workspace) then
+            candidates[model] = nil
+        elseif model ~= own then
+            local humanoid = model:FindFirstChildOfClass("Humanoid")
+            local owner = Players:GetPlayerFromCharacter(model)
+            local tagged = CollectionService:HasTag(model, "GeomEntity")
+            local kind = owner and "PLAYER" or (humanoid and "BOT" or "ENTITY")
+            if not humanoid and not owner and not tagged then
+                candidates[model] = nil
+            elseif (not humanoid or humanoid.Health > 0)
+                and ((owner and visual.players) or (not owner and humanoid and visual.bots) or (not owner and not humanoid and tagged and visual.entities)) then
+                local part = entityPart(model, humanoid)
+                if part then
+                    local d = (part.Position - origin).Magnitude
+                    if d <= visual.range then
+                        table.insert(nearby, {model = model, humanoid = humanoid, owner = owner, part = part, kind = kind, distance = d})
+                    end
+                end
+            end
+        end
+    end
+    table.sort(nearby, function(a, b) return a.distance < b.distance end)
+    local keep = {}
+    local count = math.min(#nearby, visual.limit)
+    for i = 1, count do keep[nearby[i].model] = true end
+    local stale = {}
+    for model in pairs(markers) do if not keep[model] then table.insert(stale, model) end end
+    for _, model in ipairs(stale) do removeMarker(model) end
+    for i = 1, count do
+        local entry = nearby[i]
+        local item = markerFor(entry.model, entry.part)
+        local head = entry.model:FindFirstChild("Head")
+        item.gui.Adornee = (head and head:IsA("BasePart")) and head or entry.part
+        item.gui.StudsOffsetWorldSpace = Vector3.new(0, (head and head:IsA("BasePart")) and 1.7 or 2.8, 0)
+        item.gui.AlwaysOnTop = visual.throughWalls
+        item.gui.MaxDistance = visual.range
+        local name = entry.owner and entry.owner.DisplayName or entry.model.Name
+        local parts = {}
+        if visual.kinds then table.insert(parts, entry.kind) end
+        if visual.distance then table.insert(parts, tostring(math.floor(entry.distance + 0.5)) .. " st") end
+        local h = entry.humanoid
+        if visual.health and h then table.insert(parts, tostring(math.floor(h.Health + 0.5)) .. " HP") end
+        item.name.Text = visual.names and name or ""
+        item.detail.Text = table.concat(parts, "  |  ")
+        item.bar.Visible = visual.health and h ~= nil
+        if h then item.fill.Size = UDim2.fromScale(math.clamp(h.Health / math.max(1, h.MaxHealth), 0, 1), 1) end
+        item.highlight.Enabled = visual.highlight
+        item.highlight.DepthMode = visual.throughWalls and Enum.HighlightDepthMode.AlwaysOnTop or Enum.HighlightDepthMode.Occluded
+    end
+end
+local function stopVisuals()
+    epoch += 1
+    for _, c in ipairs(visualConnections) do c:Disconnect() end
+    table.clear(visualConnections)
+    table.clear(candidates)
+    clearMarkers()
+end
+local function startVisuals()
+    stopVisuals()
+    local ticket = epoch
+    visualConnect(workspace.DescendantAdded, function(obj)
+        if obj:IsA("Humanoid") then addCandidate(obj.Parent) end
+    end)
+    visualConnect(CollectionService:GetInstanceAddedSignal("GeomEntity"), addCandidate)
+    visualConnect(CollectionService:GetInstanceRemovedSignal("GeomEntity"), function(model)
+        if model:IsA("Model") and not model:FindFirstChildOfClass("Humanoid") and not Players:GetPlayerFromCharacter(model) then
+            candidates[model] = nil
+            removeMarker(model)
+        end
+    end)
+    for _, obj in ipairs(CollectionService:GetTagged("GeomEntity")) do addCandidate(obj) end
+    for _, p in ipairs(Players:GetPlayers()) do addCandidate(p.Character) end
+    task.spawn(function()
+        -- Single initial discovery, chunked to avoid a long mobile frame.
+        local objects = workspace:GetDescendants()
+        for i, obj in ipairs(objects) do
+            if ticket ~= epoch then return end
+            if obj:IsA("Humanoid") then addCandidate(obj.Parent) end
+            if i % 300 == 0 then task.wait() end
+        end
+        while visual.enabled and ticket == epoch do
+            updateVisuals()
+            task.wait(0.20)
+        end
+    end)
+end
+local function setVisual(key, value)
+    visual[key] = value
+    if key == "enabled" then
+        if value then startVisuals() else stopVisuals() end
+    else
+        updateVisuals()
+    end
+end
+
+featureRow(pages.Visuals, 1, "ESP / Метки", function() return visual.enabled end,
+    function(v) setVisual("enabled", v) end, function(inner)
+        local options = {
+            {"players", "Игроки"}, {"bots", "Боты / NPC"}, {"entities", "Другие сущности"},
+            {"names", "Имена"}, {"kinds", "Тип сущности"}, {"distance", "Расстояние"},
+            {"health", "Здоровье / HP"}, {"highlight", "Контуры"}, {"throughWalls", "Сквозь стены"},
+        }
+        for i, item in ipairs(options) do
+            local key = item[1]
+            toggle(inner, i, item[2], function() return visual[key] end, function(v) setVisual(key, v) end, true)
+        end
+        choice(inner, 10, "Дальность (studs)", {75, 150, 250, 400, 600}, function() return visual.range end, function(v) setVisual("range", v) end)
+        choice(inner, 11, "Лимит меток", {8, 16, 24}, function() return visual.limit end, function(v) setVisual("limit", v) end)
+    end)
+info(pages.Visuals, 2, "Метки сущностей", "PLAYER — игрок, BOT — NPC, ENTITY — объект с тегом GeomEntity.")
 
 -- Category builders: only real UI functions and game information for now.
 info(pages.Player, 1, player.DisplayName, "@" .. player.Name)
@@ -283,7 +582,6 @@ local function setOpen(value)
     if opened then
         if not panel.Visible then
             panelScale.Scale = motion and 0.94 or 1
-            panel.GroupTransparency = 1
             panel.Position = UDim2.new(0.5, 0, 0.5, 10)
         end
         panel.Visible = true
@@ -292,9 +590,8 @@ local function setOpen(value)
     animate(backdrop, 0.24, {BackgroundTransparency = opened and dimBackground and 0.47 or 1})
     animate(glyph, 0.28, {Rotation = opened and 0 or -45})
     animate(ring, 0.24, {Color = opened and C.white or Color3.fromRGB(95, 95, 95)})
-    animate(panelScale, opened and 0.36 or 0.20, {Scale = opened and 1 or 0.94}, opened and Enum.EasingStyle.Back or Enum.EasingStyle.Quint)
-    local t = animate(panel, opened and 0.27 or 0.19, {
-        GroupTransparency = opened and 0 or 1,
+    animate(panelScale, opened and 0.26 or 0.17, {Scale = opened and 1 or 0.94}, opened and Enum.EasingStyle.Back or Enum.EasingStyle.Quint)
+    local t = animate(panel, opened and 0.23 or 0.17, {
         Position = UDim2.new(0.5, 0, 0.5, opened and 0 or 10),
     })
     if not opened then
@@ -312,7 +609,7 @@ toggle(pages.Settings, 1, "Анимации", function() return motion end, func
     motion = v
     if not v then
         -- Finish active transitions immediately rather than leaving intermediate states.
-        animate(panel, 0, {GroupTransparency = 0, Position = UDim2.fromScale(0.5, 0.5)})
+        animate(panel, 0, {Position = UDim2.fromScale(0.5, 0.5)})
         animate(panelScale, 0, {Scale = 1})
         animate(backdrop, 0, {BackgroundTransparency = dimBackground and 0.47 or 1})
         animate(glyph, 0, {Rotation = 0})
@@ -340,7 +637,7 @@ local rail = new("ScrollingFrame", panel, {
 })
 nav.Parent = rail
 nav.Position = UDim2.fromOffset(0, 0)
-nav.Size = UDim2.new(1, 0, 0, 182)
+nav.Size = UDim2.new(1, 0, 0, #categories * 37 - 3)
 
 local center = nil
 local lastSize = nil
@@ -361,7 +658,7 @@ local function resize()
     local s = root.AbsoluteSize
     if s.X < 1 or s.Y < 1 then return end
     local w = math.min(600, math.max(1, s.X - 20))
-    local h = math.min(326, math.max(1, s.Y - 20))
+    local h = math.min(350, math.max(1, s.Y - 20))
     local narrow = w < 410
     local side = narrow and 95 or 120
     panel.Size = UDim2.fromOffset(w, h)
@@ -429,6 +726,10 @@ connect(UIS.InputBegan, function(input, processed)
     if input.KeyCode == Enum.KeyCode.M then setOpen(not opened) end
 end)
 gui.Destroying:Connect(function()
+    visual.enabled = false
+    stopVisuals()
+    markerFolder:Destroy()
+    billboardFolder:Destroy()
     for _, c in ipairs(connections) do c:Disconnect() end
     local objects = {}
     for obj in pairs(tweens) do table.insert(objects, obj) end
