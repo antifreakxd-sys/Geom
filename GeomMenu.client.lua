@@ -1,4 +1,4 @@
--- GEOM UI 3.0 | monochrome, responsive, touch-first
+-- GEOM UI 4.0 | monochrome, responsive, touch-first
 -- LocalScript: StarterPlayer > StarterPlayerScripts
 -- All UI is created locally. Gameplay controls can be added to the category builders.
 
@@ -6,6 +6,8 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UIS = game:GetService("UserInputService")
 local CollectionService = game:GetService("CollectionService")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local old = playerGui:FindFirstChild("GeomMenu")
@@ -71,7 +73,7 @@ local backdrop = new("TextButton", root, {
 })
 local panel = new("Frame", root, {
     Name = "Menu", AnchorPoint = Vector2.new(0.5, 0.5),
-    Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(580, 320),
+    Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(460, 248),
     BackgroundColor3 = C.panel, BorderSizePixel = 0,
     Active = true, Visible = false, ZIndex = 3, ClipsDescendants = true,
 })
@@ -83,7 +85,7 @@ local header = new("Frame", panel, {
     Size = UDim2.new(1, -24, 0, 47),
 })
 text(header, "GEOM", 16, UDim2.fromOffset(2, 5), UDim2.fromOffset(110, 23), C.white, true)
-text(header, "CONTROL PANEL  /  3.0", 9, UDim2.fromOffset(2, 27), UDim2.fromOffset(185, 12), C.muted)
+text(header, "CONTROL PANEL  /  4.0", 9, UDim2.fromOffset(2, 27), UDim2.fromOffset(185, 12), C.muted)
 local close = button(header, "", C.card)
 close.AnchorPoint = Vector2.new(1, 0.5)
 close.Position = UDim2.new(1, 0, 0.5, 0)
@@ -140,6 +142,7 @@ local motion, dimBackground = true, true
 local opened, generation = false, 0
 local active = "Player"
 local tweens, connections, pages, tabs, marks = {}, {}, {}, {}, {}
+local featureRefresh = {}
 local function connect(signal, callback)
     local c = signal:Connect(callback)
     table.insert(connections, c)
@@ -169,21 +172,22 @@ local categories = {
     {"Combat", "Бой", "02"},
     {"Visuals", "Визуалы", "03"},
     {"Other", "Остальное", "04"},
-    {"Settings", "Настройки", "05"},
-    {"Games", "Игры", "06"},
+    {"Binds", "Бинды", "05"},
+    {"Settings", "Настройки", "06"},
+    {"Games", "Игры", "07"},
 }
 for i, item in ipairs(categories) do
     local key, title, index = item[1], item[2], item[3]
     local tab = button(nav, "", C.panel)
     tab.Name = key
     tab.LayoutOrder = i
-    tab.Size = UDim2.new(1, 0, 0, 34)
+    tab.Size = UDim2.new(1, 0, 0, 29)
     local marker = new("Frame", tab, {
         Position = UDim2.fromOffset(0, 8), Size = UDim2.new(0, 2, 1, -16),
         BackgroundColor3 = C.white, BackgroundTransparency = 1, BorderSizePixel = 0,
     })
     corner(marker, 2)
-    text(tab, index, 9, UDim2.fromOffset(7, 0), UDim2.fromOffset(16, 34), C.muted)
+    text(tab, index, 9, UDim2.fromOffset(7, 0), UDim2.fromOffset(16, 29), C.muted)
     text(tab, title, 11, UDim2.fromOffset(24, 0), UDim2.new(1, -25, 1, 0), C.white)
     tabs[key], marks[key] = tab, marker
 
@@ -195,7 +199,7 @@ for i, item in ipairs(categories) do
     })
     new("UIPadding", page, {PaddingRight = UDim.new(0, 5), PaddingBottom = UDim.new(0, 3)})
     new("UIListLayout", page, {Padding = UDim.new(0, 7), SortOrder = Enum.SortOrder.LayoutOrder})
-    local titleLabel = text(page, title, 15, UDim2.fromOffset(0, 0), UDim2.new(1, 0, 0, 24), C.white, true)
+    local titleLabel = text(page, title, 13, UDim2.fromOffset(0, 0), UDim2.new(1, 0, 0, 18), C.white, true)
     titleLabel.LayoutOrder = 0
     pages[key] = page
 end
@@ -247,11 +251,11 @@ local function toggle(page, order, title, getter, setter, compact)
     end
     connect(b.Activated, function() setter(not getter()); refresh(false) end)
     refresh(true)
-    return b
+    return b, refresh
 end
 
 -- Reusable accordion: separate touch targets for options and the main switch.
-local function featureRow(page, order, title, getter, setter, build)
+local function featureRow(page, order, title, getter, setter, build, key)
     local row = new("Frame", page, {
         LayoutOrder = order, Size = UDim2.new(1, 0, 0, 44),
         BackgroundColor3 = C.card, BorderSizePixel = 0, ClipsDescendants = true,
@@ -296,6 +300,7 @@ local function featureRow(page, order, title, getter, setter, build)
             BackgroundColor3 = on and C.darkText or C.white,
         })
     end
+    if key then featureRefresh[key] = refresh end
     connect(switch.Activated, function() setter(not getter()); refresh(false) end)
     refresh(true)
     local inner = new("Frame", row, {
@@ -361,8 +366,8 @@ end
 -- All markers are local, disabled by default, and limited to nearby targets.
 local visual = {
     enabled = false, players = true, bots = true, entities = true,
-    names = true, kinds = true, distance = true, health = true,
-    highlight = true, throughWalls = false, range = 250, limit = 16,
+    names = true, kinds = true, distance = true, health = false,
+    highlight = false, throughWalls = false, range = 150, limit = 8, declutter = true,
 }
 local candidates, markers = {}, {}
 local visualConnections = {}
@@ -396,23 +401,23 @@ local function markerFor(model, part)
     local item = markers[model]
     if item then return item end
     local g = new("BillboardGui", playerGui, {
-        Name = "GeomEntityLabel", Adornee = part, Size = UDim2.fromOffset(170, 56),
+        Name = "GeomEntityLabel", Adornee = part, Size = UDim2.fromOffset(104, 25),
         StudsOffsetWorldSpace = Vector3.new(0, 2.8, 0), LightInfluence = 0,
         AlwaysOnTop = visual.throughWalls, MaxDistance = visual.range,
     })
     local name = new("TextLabel", g, {
-        Size = UDim2.new(1, 0, 0, 23), Position = UDim2.fromOffset(0, 1),
+        Size = UDim2.new(1, 0, 0, 12), Position = UDim2.fromOffset(0, 0),
         BackgroundTransparency = 1, TextColor3 = C.white, TextStrokeTransparency = 0.15,
-        TextSize = 14, Font = Enum.Font.GothamBold, TextTruncate = Enum.TextTruncate.AtEnd,
+        TextSize = 10, Font = Enum.Font.GothamBold, TextTruncate = Enum.TextTruncate.AtEnd,
     })
     local detail = new("TextLabel", g, {
-        Size = UDim2.new(1, 0, 0, 19), Position = UDim2.fromOffset(0, 24),
+        Size = UDim2.new(1, 0, 0, 10), Position = UDim2.fromOffset(0, 12),
         BackgroundTransparency = 1, TextColor3 = C.white, TextStrokeTransparency = 0.15,
-        TextSize = 11, Font = Enum.Font.GothamMedium,
+        TextSize = 9, Font = Enum.Font.GothamMedium,
     })
     local bar = new("Frame", g, {
-        AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 46),
-        Size = UDim2.fromOffset(64, 4), BackgroundColor3 = C.selected, BorderSizePixel = 0,
+        AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 23),
+        Size = UDim2.fromOffset(36, 2), BackgroundColor3 = C.selected, BorderSizePixel = 0,
     })
     corner(bar, 2)
     local fill = new("Frame", bar, {Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.white, BorderSizePixel = 0})
@@ -453,28 +458,42 @@ local function updateVisuals()
         end
     end
     table.sort(nearby, function(a, b) return a.distance < b.distance end)
-    local keep = {}
-    local count = math.min(#nearby, visual.limit)
-    for i = 1, count do keep[nearby[i].model] = true end
+    local keep, selected, occupied = {}, {}, {}
+    for _, entry in ipairs(nearby) do
+        if #selected >= visual.limit then break end
+        local head = entry.model:FindFirstChild("Head")
+        local anchor = head and head:IsA("BasePart") and head.Position or entry.part.Position
+        local screen, onScreen = camera:WorldToViewportPoint(anchor + Vector3.new(0, head and 1.2 or 2.0, 0))
+        local overlaps = false
+        if onScreen and visual.declutter then
+            for _, p in ipairs(occupied) do
+                if math.abs(p.X - screen.X) < 106 and math.abs(p.Y - screen.Y) < 28 then overlaps = true; break end
+            end
+        end
+        if onScreen and not overlaps then
+            table.insert(selected, entry); table.insert(occupied, screen); keep[entry.model] = true
+        end
+    end
+    local count = #selected
     local stale = {}
     for model in pairs(markers) do if not keep[model] then table.insert(stale, model) end end
     for _, model in ipairs(stale) do removeMarker(model) end
     for i = 1, count do
-        local entry = nearby[i]
+        local entry = selected[i]
         local item = markerFor(entry.model, entry.part)
         local head = entry.model:FindFirstChild("Head")
         item.gui.Adornee = (head and head:IsA("BasePart")) and head or entry.part
-        item.gui.StudsOffsetWorldSpace = Vector3.new(0, (head and head:IsA("BasePart")) and 1.7 or 2.8, 0)
+        item.gui.StudsOffsetWorldSpace = Vector3.new(0, (head and head:IsA("BasePart")) and 1.2 or 2.0, 0)
         item.gui.AlwaysOnTop = visual.throughWalls
         item.gui.MaxDistance = visual.range
         local name = entry.owner and entry.owner.DisplayName or entry.model.Name
         local parts = {}
-        if visual.kinds then table.insert(parts, entry.kind) end
+        if visual.kinds then table.insert(parts, entry.kind == "PLAYER" and "PLY" or entry.kind == "ENTITY" and "ENT" or "BOT") end
         if visual.distance then table.insert(parts, tostring(math.floor(entry.distance + 0.5)) .. " st") end
         local h = entry.humanoid
         if visual.health and h then table.insert(parts, tostring(math.floor(h.Health + 0.5)) .. " HP") end
         item.name.Text = visual.names and name or ""
-        item.detail.Text = table.concat(parts, "  |  ")
+        item.detail.Text = table.concat(parts, " · ")
         item.bar.Visible = visual.health and h ~= nil
         if h then item.fill.Size = UDim2.fromScale(math.clamp(h.Health / math.max(1, h.MaxHealth), 0, 1), 1) end
         if visual.highlight then
@@ -542,22 +561,111 @@ featureRow(pages.Visuals, 1, "ESP / Метки", function() return visual.enable
         local options = {
             {"players", "Игроки"}, {"bots", "Боты / NPC"}, {"entities", "Другие сущности"},
             {"names", "Имена"}, {"kinds", "Тип сущности"}, {"distance", "Расстояние"},
-            {"health", "Здоровье / HP"}, {"highlight", "Контуры"}, {"throughWalls", "Сквозь стены"},
+            {"health", "Здоровье / HP"}, {"highlight", "Контуры"}, {"throughWalls", "Сквозь стены"}, {"declutter", "Без наложений"},
         }
         for i, item in ipairs(options) do
             local key = item[1]
             toggle(inner, i, item[2], function() return visual[key] end, function(v) setVisual(key, v) end, true)
         end
-        choice(inner, 10, "Дальность (studs)", {75, 150, 250, 400, 600}, function() return visual.range end, function(v) setVisual("range", v) end)
-        choice(inner, 11, "Лимит меток", {8, 16, 24}, function() return visual.limit end, function(v) setVisual("limit", v) end)
-    end)
-info(pages.Visuals, 2, "Метки сущностей", "PLAYER — игрок, BOT — NPC, ENTITY — объект с тегом GeomEntity.")
+        choice(inner, 11, "Дальность (studs)", {75, 150, 250, 400, 600}, function() return visual.range end, function(v) setVisual("range", v) end)
+        choice(inner, 12, "Лимит меток", {4, 8, 12, 16}, function() return visual.limit end, function(v) setVisual("limit", v) end)
+    end, "ESP")
 
 -- Category builders: only real UI functions and game information for now.
 info(pages.Player, 1, player.DisplayName, "@" .. player.Name)
 info(pages.Player, 2, "Профиль", "ID: " .. tostring(player.UserId))
-info(pages.Combat, 1, "Боевые функции", "Пока не добавлены. Раздел готов к расширению.")
-info(pages.Other, 1, "Дополнительные функции", "Здесь будут новые возможности игры.")
+
+
+-- Camera aim assistance for the experience: only visible live targets, no firing.
+-- NPC models opt in using the GeomAimTarget tag; player targets require game opt-in.
+local aim = {enabled = false, range = 120, angle = 12, smooth = 8, players = false}
+local aimTarget, aimClock = nil, 0
+local aimStepName = "GeomAim_" .. tostring(player.UserId)
+local function targetPart(model)
+    if not model or model == player.Character or not model:IsDescendantOf(workspace) then return nil end
+    local hum = model:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then return nil end
+    local part = model:FindFirstChild("HumanoidRootPart")
+    return part and part:IsA("BasePart") and part or nil
+end
+local function aimScore(camera, model)
+    local part = targetPart(model)
+    if not part then return nil end
+    local delta = part.Position - camera.CFrame.Position
+    local distance = delta.Magnitude
+    if distance < 1 or distance > aim.range then return nil end
+    local angle = math.deg(math.acos(math.clamp(camera.CFrame.LookVector:Dot(delta.Unit), -1, 1)))
+    if angle > aim.angle then return nil end
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = player.Character and {player.Character} or {}
+    local hit = workspace:Raycast(camera.CFrame.Position, delta, params)
+    if hit and not hit.Instance:IsDescendantOf(model) then return nil end
+    return angle, part
+end
+local function findAim(camera)
+    local best, score = nil, math.huge
+    local function consider(model)
+        if not model:IsA("Model") then return end
+        local a = aimScore(camera, model)
+        if a and a < score then best, score = model, a end
+    end
+    for _, model in ipairs(CollectionService:GetTagged("GeomAimTarget")) do
+        if not Players:GetPlayerFromCharacter(model) then consider(model) end
+    end
+    if aim.players and workspace:GetAttribute("GeomPvPAimAssist") == true then
+        for _, other in ipairs(Players:GetPlayers()) do
+            if other ~= player and other.Character and (player.Neutral or other.Neutral or player.Team ~= other.Team) then
+                consider(other.Character)
+            end
+        end
+    end
+    return best
+end
+local function setAim(v)
+    aim.enabled = v
+    RunService:UnbindFromRenderStep(aimStepName)
+    aimTarget, aimClock = nil, 0
+    if v then
+        RunService:BindToRenderStep(aimStepName, Enum.RenderPriority.Camera.Value + 1, function(dt)
+            local camera = workspace.CurrentCamera
+            if not camera or opened or camera.CameraType == Enum.CameraType.Scriptable then aimTarget = nil; aimClock = 0; return end
+            aimClock -= dt
+            if aimClock <= 0 then aimTarget = findAim(camera); aimClock = 0.12 end
+            if not aimTarget then return end
+            local owner = Players:GetPlayerFromCharacter(aimTarget)
+            if owner and (not aim.players or workspace:GetAttribute("GeomPvPAimAssist") ~= true or (not player.Neutral and not owner.Neutral and player.Team == owner.Team)) then aimTarget = nil; return end
+            local part = targetPart(aimTarget)
+            if not part then aimTarget = nil; return end
+            local delta = part.Position - camera.CFrame.Position
+            if delta.Magnitude < 1 or delta.Magnitude > aim.range then aimTarget = nil; return end
+            camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(camera.CFrame.Position, part.Position), 1 - math.exp(-aim.smooth * dt))
+        end)
+    end
+end
+featureRow(pages.Combat, 1, "Aim Assist", function() return aim.enabled end, setAim, function(inner)
+    choice(inner, 1, "Угол (градусы)", {5, 8, 12, 18, 25}, function() return aim.angle end, function(v) aim.angle = v end)
+    choice(inner, 2, "Плавность", {3, 5, 8, 12, 16}, function() return aim.smooth end, function(v) aim.smooth = v end)
+    choice(inner, 3, "Дальность (studs)", {50, 80, 120, 180}, function() return aim.range end, function(v) aim.range = v end)
+    toggle(inner, 4, "Игроки (PvP)", function() return aim.players end, function(v) aim.players = v; aimClock = 0 end, true)
+end, "AIM")
+
+-- Noclip state is acknowledged by the server; no client-only physics bypass.
+local noclip = player:GetAttribute("GeomNoclipActive") == true
+local function setNoclip(v)
+    local remote = ReplicatedStorage:FindFirstChild("GeomMovement")
+    if remote and remote:IsA("RemoteEvent") then remote:FireServer(v) end
+end
+local refreshNoclip
+local bindRefresh = {}
+local function syncNoclip()
+    noclip = player:GetAttribute("GeomNoclipActive") == true
+    if refreshNoclip then refreshNoclip(false) end
+    if bindRefresh.NC then bindRefresh.NC() end
+end
+connect(player:GetAttributeChangedSignal("GeomNoclipActive"), syncNoclip)
+local noclipRow
+noclipRow, refreshNoclip = toggle(pages.Other, 1, "Noclip", function() return noclip end, setNoclip)
 
 local function selectPage(key, instant)
     if not pages[key] then return end
@@ -643,7 +751,7 @@ local rail = new("ScrollingFrame", panel, {
 })
 nav.Parent = rail
 nav.Position = UDim2.fromOffset(0, 0)
-nav.Size = UDim2.new(1, 0, 0, #categories * 37 - 3)
+nav.Size = UDim2.new(1, 0, 0, #categories * 32 - 3)
 
 local center = nil
 local lastSize = nil
@@ -663,10 +771,10 @@ end
 local function resize()
     local s = root.AbsoluteSize
     if s.X < 1 or s.Y < 1 then return end
-    local w = math.min(600, math.max(1, s.X - 20))
-    local h = math.min(350, math.max(1, s.Y - 20))
+    local w = math.min(460, math.max(1, s.X - 16))
+    local h = math.min(248, math.max(1, s.Y - 16))
     local narrow = w < 410
-    local side = narrow and 95 or 120
+    local side = narrow and 88 or 100
     panel.Size = UDim2.fromOffset(w, h)
     rail.Size = UDim2.new(0, side, 1, -67)
     separator.Position = UDim2.fromOffset(side + 17, 56)
@@ -731,7 +839,92 @@ connect(UIS.InputBegan, function(input, processed)
     if processed or UIS:GetFocusedTextBox() then return end
     if input.KeyCode == Enum.KeyCode.M then setOpen(not opened) end
 end)
+-- Persistent per-session mobile buttons. A drag never toggles a feature.
+local bindItems = {}
+local function refreshBind(key)
+    local item = bindItems[key]
+    if not item then return end
+    local on = item.get()
+    item.button.BackgroundColor3 = on and C.white or C.black
+    item.button.TextColor3 = on and C.darkText or C.white
+    item.stroke.Color = on and C.white or C.muted
+end
+local function bindButton(key, title, order, getter, setter, defaultY)
+    local item = {get = getter, set = setter, enabled = false, fraction = Vector2.new(0.14, defaultY)}
+    bindItems[key] = item
+    local b = new("TextButton", root, {
+        Name = "Bind_" .. key, AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(44, 44),
+        BackgroundColor3 = C.black, Text = key, Font = Enum.Font.GothamBold, TextSize = 11,
+        TextColor3 = C.white, BorderSizePixel = 0, AutoButtonColor = false, Visible = false, ZIndex = 9,
+    })
+    new("UICorner", b, {CornerRadius = UDim.new(1, 0)})
+    item.button, item.stroke = b, outline(b, C.muted)
+    local scale = new("UIScale", b, {Scale = 1})
+    local function place(p)
+        local size = root.AbsoluteSize
+        if size.X < 1 or size.Y < 1 then return end
+        local pos = clampCenter(p)
+        item.fraction = Vector2.new(pos.X / size.X, pos.Y / size.Y)
+        b.Position = UDim2.fromOffset(pos.X, pos.Y)
+    end
+    local function reposition()
+        local size = root.AbsoluteSize
+        place(Vector2.new(item.fraction.X * size.X, item.fraction.Y * size.Y))
+    end
+    connect(root:GetPropertyChangedSignal("AbsoluteSize"), reposition)
+    local dragState
+    connect(b.InputBegan, function(input)
+        local kind = input.UserInputType
+        if dragState or (kind ~= Enum.UserInputType.Touch and kind ~= Enum.UserInputType.MouseButton1) then return end
+        dragState = {input = input, kind = kind, start = Vector2.new(input.Position.X, input.Position.Y), origin = Vector2.new(b.Position.X.Offset, b.Position.Y.Offset), moved = false}
+        animate(scale, 0.10, {Scale = 0.88})
+    end)
+    connect(UIS.InputChanged, function(input)
+        local d = dragState
+        if not d then return end
+        if d.kind == Enum.UserInputType.Touch then if input ~= d.input then return end
+        elseif input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+        local delta = Vector2.new(input.Position.X, input.Position.Y) - d.start
+        if delta.Magnitude >= 8 then d.moved = true end
+        if d.moved then place(d.origin + delta) end
+    end)
+    connect(UIS.InputEnded, function(input)
+        local d = dragState
+        if not d then return end
+        if d.kind == Enum.UserInputType.Touch then if input ~= d.input then return end
+        elseif input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+        dragState = nil
+        animate(scale, 0.20, {Scale = 1}, Enum.EasingStyle.Back)
+        if not d.moved and item.enabled and input.UserInputState == Enum.UserInputState.End then
+            setter(not getter())
+            refreshBind(key)
+            if featureRefresh[key] then featureRefresh[key](false) end
+        end
+    end)
+    connect(UIS.WindowFocusReleased, function() dragState = nil; animate(scale, 0, {Scale = 1}) end)
+    toggle(pages.Binds, order, title, function() return item.enabled end, function(v)
+        item.enabled = v
+        b.Visible = v
+        dragState = nil
+        if v then reposition(); refreshBind(key) end
+    end)
+    bindRefresh[key] = function() refreshBind(key) end
+    reposition()
+end
+bindButton("AIM", "Aim Assist", 1, function() return aim.enabled end, setAim, 0.36)
+bindButton("ESP", "ESP", 2, function() return visual.enabled end, function(v) setVisual("enabled", v) end, 0.48)
+bindButton("NC", "Noclip", 3, function() return noclip end, setNoclip, 0.60)
+-- Update shortcut appearance when the equivalent menu switch changes.
+connect(RunService.Heartbeat, function()
+    for key, item in pairs(bindItems) do
+        local current = item.get()
+        if item.last ~= current then item.last = current; refreshBind(key) end
+    end
+end)
+
 gui.Destroying:Connect(function()
+    setAim(false)
+    if noclip then setNoclip(false) end
     visual.enabled = false
     stopVisuals()
     markerFolder:Destroy()
